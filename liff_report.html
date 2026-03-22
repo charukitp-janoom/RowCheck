@@ -196,7 +196,7 @@
           <div class="choice-card present" id="card-present" onclick="selStatus('มา')">
             <span class="ci">✅</span>
             <div class="cl">มารวมแถว</div>
-            <div class="cs">ปกติ / พร้อม</div>
+            <div class="cs" id="cs-present">ปกติ / พร้อม</div>
           </div>
           <div class="choice-card absent" id="card-absent" onclick="selStatus('ไม่มา')">
             <span class="ci">❌</span>
@@ -207,7 +207,7 @@
 
         <!-- Warning: เกินเวลา -->
         <div class="sbar warning hidden" id="overtime-warn">
-          ⚠️ เกินเวลา 08:00 น. — รายงานจะถูกบันทึกว่า "เกินเวลา"
+          ⚠️ เกินเวลา 08:00 น. — ต้องระบุเหตุผลทุกกรณี
         </div>
       </div>
     </div>
@@ -385,10 +385,37 @@ function selStatus(status) {
   $('card-absent').classList.toggle('sel',  status === 'ไม่มา');
   clearSbar();
 
-  if (status === 'มา') {
-    // ข้าม step 2 ไป step 3 ตรงๆ
+  const nowBkk  = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+  const isPastCutoff = nowBkk.getHours() >= 8;
+
+  if (status === 'มา' && !isPastCutoff) {
+    // ก่อน 08:00 + มา → ข้าม step 2 ตรงไป step 3
     goStep3();
+  } else if (status === 'มา' && isPastCutoff) {
+    // หลัง 08:00 + มา → ต้องผ่าน step 2 (บังคับใส่เหตุผล)
+    setSbar('warning', '⚠️ เกินเวลา 08:00 น. กรุณาระบุเหตุผลที่มาสาย');
+    // เปลี่ยน chip เป็นเหตุผล "มาสาย" พิเศษ
+    $('reason-chips').innerHTML =
+      '<button class="chip" onclick="selChip(this,'มาสาย')">⏰ มาสาย</button>' +
+      '<button class="chip" onclick="selChip(this,'ภารกิจก่อนหน้า')">🚗 ภารกิจก่อนหน้า</button>' +
+      '<button class="chip" onclick="selChip(this,'เหตุฉุกเฉิน')">🚨 เหตุฉุกเฉิน</button>' +
+      '<button class="chip" onclick="selChip(this,'อื่นๆ')">✏️ อื่นๆ</button>';
+    $('sec-step2').querySelector('.card-hdr').textContent = '📝 เหตุผลที่มาสาย (หลัง 08:00 น.)';
+    $('sec-step2').querySelector('.card-hdr').style.color = 'var(--yellow)';
+    $('btn-next1').classList.remove('hidden');
+    goStep2();
   } else {
+    // ไม่มา → step 2 ปกติ
+    $('reason-chips').innerHTML =
+      '<button class="chip" onclick="selChip(this,'ลาป่วย')">🏥 ลาป่วย</button>' +
+      '<button class="chip" onclick="selChip(this,'ลากิจ')">📋 ลากิจ</button>' +
+      '<button class="chip" onclick="selChip(this,'ลาพักผ่อน')">🏖 ลาพักผ่อน</button>' +
+      '<button class="chip" onclick="selChip(this,'เวรยาม')">🛡 เวรยาม</button>' +
+      '<button class="chip" onclick="selChip(this,'ปฏิบัติภารกิจนอกหน่วย')">🚗 ภารกิจนอกหน่วย</button>' +
+      '<button class="chip" onclick="selChip(this,'อบรม/สัมมนา')">📚 อบรม</button>' +
+      '<button class="chip" onclick="selChip(this,'อื่นๆ')">✏️ อื่นๆ</button>';
+    $('sec-step2').querySelector('.card-hdr').textContent = '📝 เหตุผลที่ไม่มารวมแถว';
+    $('sec-step2').querySelector('.card-hdr').style.color = 'var(--red)';
     $('btn-next1').classList.remove('hidden');
     goStep2();
   }
