@@ -141,9 +141,53 @@ tr:last-child td{border-bottom:none}
   .sidebar{display:none}
   .kpi-row{grid-template-columns:1fr 1fr}
   .g2{grid-template-columns:1fr}
-  .main{padding:16px}
+  .main{padding:16px 12px 80px}
 }
 @media(max-width:500px){.kpi-row{grid-template-columns:1fr 1fr}}
+
+/* ── Quick Reply Bar (sticky bottom) ── */
+.qr-bar{
+  position:fixed;bottom:0;left:0;right:0;z-index:500;
+  background:var(--card);
+  border-top:1px solid var(--border2);
+  padding:10px 16px 10px;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  display:flex;align-items:center;gap:8px;overflow-x:auto;
+  scrollbar-width:none;
+  box-shadow:0 -4px 20px rgba(0,0,0,.4);
+}
+.qr-bar::-webkit-scrollbar{display:none}
+.qr-bar-label{
+  font-size:10px;font-weight:700;letter-spacing:1px;
+  color:var(--muted);text-transform:uppercase;
+  flex-shrink:0;white-space:nowrap;
+}
+.qr-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:7px 14px;border-radius:20px;
+  font-family:'IBM Plex Sans Thai',sans-serif;
+  font-size:12px;font-weight:700;
+  border:1.5px solid var(--border2);
+  background:var(--card2);color:var(--text);
+  cursor:pointer;transition:all .15s;
+  white-space:nowrap;flex-shrink:0;
+  -webkit-tap-highlight-color:transparent;
+}
+.qr-chip:active{transform:scale(.95)}
+.qr-chip:hover{background:rgba(56,189,100,.1);border-color:var(--green);color:var(--green)}
+.qr-chip.chip-green{border-color:rgba(34,197,94,.4);color:var(--green2)}
+.qr-chip.chip-green:hover{background:rgba(34,197,94,.12)}
+.qr-chip.chip-red  {border-color:rgba(239,68,68,.35);color:var(--red)}
+.qr-chip.chip-red:hover{background:rgba(239,68,68,.1)}
+.qr-chip.chip-gold {border-color:rgba(226,168,41,.35);color:var(--gold)}
+.qr-chip.chip-gold:hover{background:rgba(226,168,41,.1)}
+.qr-chip.chip-line {border-color:rgba(6,199,85,.4);background:linear-gradient(135deg,rgba(6,199,85,.15),rgba(0,160,64,.1));color:#06C755}
+.qr-chip.chip-line:hover{background:linear-gradient(135deg,rgba(6,199,85,.25),rgba(0,160,64,.18))}
+.qr-chip.chip-tg   {border-color:rgba(34,158,217,.35);color:#229ED9}
+.qr-chip.chip-tg:hover{background:rgba(34,158,217,.1)}
+
+/* เว้น padding ล่างให้ content ไม่ถูก bar บัง */
+.main{padding-bottom:80px}
 </style>
 </head>
 <body>
@@ -271,6 +315,43 @@ tr:last-child td{border-bottom:none}
     </div>
 
   </div>
+</div>
+
+<!-- ═══ Quick Reply Bar — เสมียน ═══ -->
+<div class="qr-bar" id="qrBar">
+  <div class="qr-bar-label">ลัด</div>
+
+  <button class="qr-chip" onclick="loadData()" title="รีเฟรชข้อมูลล่าสุด">
+    🔄 รีเฟรช
+  </button>
+
+  <button class="qr-chip chip-green" onclick="scrollToSection('reportTbl')" title="ดูรายการรายงานวันนี้">
+    ✅ รายการมา
+  </button>
+
+  <button class="qr-chip chip-red" onclick="scrollToSection('notRepTbl')" title="ดูรายการยังไม่รายงาน">
+    ⏳ ยังไม่รายงาน
+  </button>
+
+  <button class="qr-chip chip-gold" onclick="scrollToAbsent()" title="กรองเฉพาะคนขาด">
+    ❌ รายการขาด
+  </button>
+
+  <button class="qr-chip chip-line" onclick="openLineSend()" title="render ภาพสรุปแล้วส่ง LINE ผบ.ร้อย">
+    📸 ส่ง LINE ผบ.ร้อย
+  </button>
+
+  <button class="qr-chip chip-tg" onclick="sendTg()" title="ส่งสรุปยอดไป Telegram">
+    📲 Telegram
+  </button>
+
+  <button class="qr-chip" onclick="exportCSV()" title="ดาวน์โหลดข้อมูลเป็น CSV">
+    ⬇️ CSV
+  </button>
+
+  <button class="qr-chip" onclick="pickToday()" title="กลับมาดูยอดวันนี้">
+    📅 วันนี้
+  </button>
 </div>
 
 <script>
@@ -597,6 +678,40 @@ function buildReportCardHTML(d) {
 function showSection(name) {
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   event.target.classList.add('active');
+}
+
+// Quick Reply helpers
+function scrollToSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.closest('.a-card').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function scrollToAbsent() {
+  // filter ตารางให้เหลือเฉพาะ "ไม่มา" แล้วเลื่อนไปที่ตาราง
+  const q = document.getElementById('searchInput');
+  q.value = '';
+  const tbody = document.getElementById('reportTbl');
+  const absent = allReportRows.filter(r => r.status === 'ไม่มา');
+  if (!absent.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted2);padding:18px;">✅ ไม่มีคนขาดวันนี้</td></tr>';
+  } else {
+    tbody.innerHTML = absent.map((r,i) => `
+      <tr>
+        <td style="color:var(--muted2)">${i+1}</td>
+        <td>${r.name}</td>
+        <td><span class="badge ba">ไม่มา</span></td>
+        <td style="font-size:12px;color:var(--muted2)">${r.reason&&r.reason!=='-'?r.reason:'—'}</td>
+        <td>${r.time||'—'}</td>
+        <td><span class="badge ${r.onTime==='ทันเวลา'?'bo':'bl'}">${r.onTime||'—'}</span></td>
+      </tr>`).join('');
+  }
+  scrollToSection('reportTbl');
+}
+
+function pickToday() {
+  document.getElementById('datePicker').value = getTodayISO();
+  loadData();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // ════════════════════════════════════════════════
