@@ -335,8 +335,14 @@ async function submitRegister() {
     showSuccess(fullName);
   } catch(e) {
     try {
-      const form = new FormData(); form.append('payload', JSON.stringify(payload));
-      const resp = await fetch(GAS_URL, { method:'POST', body:form });
+      // GAS POST ต้องใช้ JSON + redirect:'follow'
+      // FormData จะ trigger redirect แล้วได้ 405 เพราะ browser เปลี่ยน POST → GET
+      const resp = await fetch(GAS_URL, {
+        method:   'POST',
+        redirect: 'follow',
+        headers:  { 'Content-Type': 'application/json' },
+        body:     JSON.stringify(payload),
+      });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
       if (data.status !== 'ok') throw new Error(data.message || 'failed');
