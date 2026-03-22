@@ -502,24 +502,28 @@ async function submitReport() {
     reason:  reason || '-',
   };
 
-  // ── วิธีหลัก: sendMessages ผ่าน LINE Chat ──
-  // GAS รับใน handleTextMessage → parse สถานะ/เหตุผล
-  try {
-    const msgText = S.status === 'มา'
-      ? 'มา'
-      : ('เหตุผล:' + (reason || '-'));
-    await liff.sendMessages([{ type:'text', text: msgText }]);
-    showSuccess(reason);
-    return;
-  } catch(sendErr) {
-    console.warn('sendMessages failed:', sendErr.message);
-  }
-
-  // ── Fallback: XHR text/plain (หลีกเลี่ยง CORS preflight) ──
+  // ── วิธีหลัก: XHR โดยตรง → GAS handleLiffSubmit ──
+  // ไม่ใช้ sendMessages แล้ว เพราะทำให้บันทึกซ้ำ
+  // (sendMessages → webhook → handleTextMessage บันทึก 1 ครั้ง
+  //  + XHR fallback → handleLiffSubmit บันทึกซ้ำอีก 1 ครั้ง)
   try {
     const result = await xhrPost(GAS_URL, payload);
     if (result.status !== 'ok') throw new Error(result.message || 'บันทึกล้มเหลว');
     showSuccess(reason, result.onTime);
+    return;
+  } catch(e) {
+    console.warn('XHR failed, try sendMessages fallback:', e.message);
+  }
+
+  // ── Fallback: sendMessages พร้อม prefix __LIFF__ ──
+  // GAS จะ route ไป handleLiffSubmit โดยตรง ไม่ผ่าน handleTextMessage
+  // จึงไม่บันทึกซ้ำ
+  try {
+    const msgText = '__LIFF__' + JSON.stringify({
+      status: S.status, reason: reason || '-', fullName: S.fullName
+    });
+    await liff.sendMessages([{ type:'text', text: msgText }]);
+    showSuccess(reason);
   } catch(e2) {
     console.error('submitReport error:', e2);
     setSbar('error','❌ บันทึกไม่สำเร็จ: ' + e2.message);
