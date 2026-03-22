@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>รายงานรวมแถว</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
+  :root {
+    --green:#00c853; --green-dark:#009624; --bg:#0d1117;
+    --surface:#161b22; --surface2:#21262d; --border:#30363d;
+    --text:#e6edf3; --muted:#7d8590; --red:#f85149;
+    --yellow:#d29922; --blue:#388bfd; --gold:#e2a829;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+  /* ── OVERLAYS (เหมือน liff-scanner) ── */
+  .ov{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:40px;text-align:center;z-index:9999}
+  .ov.hidden{display:none}
+  .ov-icon{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px}
+  .ov-icon.load{background:rgba(56,139,253,.1);border:2px solid var(--blue);animation:pulse 1.5s ease-in-out infinite}
+  .ov-icon.ok  {background:rgba(0,200,83,.15);border:2px solid var(--green)}
+  .ov-icon.warn{background:rgba(248,81,73,.15);border:2px solid var(--red)}
+  .ov-title{font-size:20px;font-weight:700}
+  .ov-title.blue {color:var(--blue)}
+  .ov-title.green{color:var(--green)}
+  .ov-title.red  {color:var(--red)}
+  .info-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 24px;width:100%;max-width:320px;text-align:left}
+  .info-card .lbl{font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+  .info-card .val{font-size:15px;font-weight:600}
+  .alert{border-radius:10px;padding:14px 16px;font-size:13px;line-height:1.7;width:100%;max-width:320px;white-space:pre-line;text-align:left}
+  .alert.green{background:rgba(0,200,83,.1);border:1px solid rgba(0,200,83,.3);color:var(--green)}
+  .alert.muted{background:var(--surface);border:1px solid var(--border);color:var(--muted);text-align:center}
+
+  /* ── HEADER ── */
+  .hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}
+  .hdr-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--gold),#b45309);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+  .hdr-title{font-size:16px;font-weight:700}
+  .hdr-sub{font-size:11px;color:var(--muted);margin-top:1px}
+  .badge{margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+
+  /* ── CONTENT ── */
+  .content{padding:20px 16px 40px;max-width:500px;margin:0 auto}
+
+  /* ── STEPS (เหมือน liff-scanner) ── */
+  .steps{display:flex;margin-bottom:24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .step{flex:1;padding:10px 4px;text-align:center;font-size:11px;color:var(--muted);transition:all .3s;border-right:1px solid var(--border)}
+  .step:last-child{border-right:none}
+  .step.active{background:rgba(226,168,41,.1);color:var(--gold);font-weight:600}
+  .step.done{color:var(--green)}
+  .step-num{display:block;font-size:16px;font-weight:700;margin-bottom:2px;font-family:'IBM Plex Mono',monospace}
+
+  /* ── BUTTONS ── */
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border:none;border-radius:10px;font-family:'Sarabun',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;-webkit-appearance:none}
+  .btn:active{transform:scale(.97)}
+  .btn-present{background:var(--green);color:#000}
+  .btn-present:hover{background:#00e676}
+  .btn-absent {background:var(--red);color:#fff}
+  .btn-absent:hover{background:#ff6b6b}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .btn-row{display:flex;gap:8px}
+  .btn-row .btn-back{flex:0 0 auto;width:auto;padding:14px 20px}
+
+  /* ── CARD ── */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:16px;animation:fadeIn .4s ease}
+  .card-hdr{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}
+  .card-body{padding:16px;display:flex;flex-direction:column;gap:14px}
+
+  /* ── CHOICE CARDS ── */
+  .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px}
+  .choice-card{background:var(--surface2);border:2px solid var(--border);border-radius:14px;padding:20px 10px;text-align:center;cursor:pointer;transition:all .2s;user-select:none}
+  .choice-card:active{transform:scale(.96)}
+  .choice-card .ci{font-size:36px;display:block;margin-bottom:8px}
+  .choice-card .cl{font-size:15px;font-weight:700}
+  .choice-card .cs{font-size:11px;color:var(--muted);margin-top:4px}
+  .choice-card.present.sel{border-color:var(--green);background:rgba(0,200,83,.1)}
+  .choice-card.present.sel .cl{color:var(--green)}
+  .choice-card.absent.sel {border-color:var(--red);background:rgba(248,81,73,.08)}
+  .choice-card.absent.sel  .cl{color:var(--red)}
+
+  /* ── REASON CHIPS ── */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+  .chip{font-family:'Sarabun',sans-serif;font-size:13px;font-weight:600;padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;transition:all .15s}
+  .chip.sel{background:rgba(226,168,41,.15);border-color:var(--gold);color:var(--gold)}
+
+  /* ── FORM ── */
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  textarea,input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:11px 14px;font-family:'Sarabun',sans-serif;font-size:15px;color:var(--text);outline:none;transition:border-color .2s;-webkit-appearance:none}
+  textarea:focus,input:focus{border-color:var(--gold)}
+  textarea::placeholder,input::placeholder{color:var(--muted)}
+  textarea{resize:none}
+
+  /* ── CONFIRM PANEL ── */
+  .confirm-panel{background:var(--surface);border:1px solid rgba(0,200,83,.3);border-radius:16px;overflow:hidden;margin-bottom:16px;animation:fadeIn .3s ease}
+  .confirm-hdr{padding:14px 16px;background:rgba(0,200,83,.1);border-bottom:1px solid rgba(0,200,83,.2);font-weight:700;font-size:14px;color:var(--green)}
+  .confirm-row{display:flex;padding:11px 16px;border-bottom:1px solid var(--border);gap:12px}
+  .confirm-row:last-child{border-bottom:none}
+  .confirm-key{font-size:12px;color:var(--muted);width:90px;flex-shrink:0;padding-top:2px}
+  .confirm-val{font-size:14px;font-weight:500;word-break:break-all}
+
+  /* ── STATUS BAR ── */
+  .sbar{margin-bottom:16px;border-radius:10px;padding:12px 14px;font-size:13px;display:flex;align-items:center;gap:8px;animation:fadeIn .3s ease;line-height:1.5}
+  .sbar.error  {background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);color:var(--red)}
+  .sbar.success{background:rgba(0,200,83,.1); border:1px solid rgba(0,200,83,.3); color:var(--green)}
+  .sbar.info   {background:rgba(56,139,253,.1);border:1px solid rgba(56,139,253,.3);color:var(--blue)}
+  .sbar.warning{background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.3);color:var(--yellow)}
+
+  /* ── CLOCK PILL ── */
+  .clock-pill{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13px}
+  .clock-time{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;color:var(--gold)}
+  .clock-status{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
+  .clock-status.open  {background:rgba(0,200,83,.15);color:var(--green);border:1px solid rgba(0,200,83,.3)}
+  .clock-status.closed{background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3)}
+
+  /* ── UTILS ── */
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.08);opacity:.7}}
+  .hidden{display:none!important}
+  .mt8{margin-top:8px}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="ov-load" class="ov">
+  <div class="ov-icon load">🎖️</div>
+  <div class="ov-title blue" id="load-txt">กำลังเชื่อมต่อระบบ...</div>
+</div>
+
+<!-- SUCCESS -->
+<div id="ov-ok" class="ov hidden">
+  <div class="ov-icon ok">✅</div>
+  <div class="ov-title green" id="ok-title">บันทึกสำเร็จ!</div>
+  <div class="info-card">
+    <div class="lbl">ชื่อ-ยศ</div>
+    <div class="val" id="ok-name">—</div>
+  </div>
+  <div class="alert green" id="ok-detail">บันทึกรายงานรวมแถวเรียบร้อยแล้ว</div>
+  <button class="btn btn-secondary" style="max-width:240px" onclick="resetAll()">🔄 รายงานใหม่</button>
+  <button class="btn btn-present"   style="max-width:240px" onclick="liff.closeWindow()">✔️ ปิดและกลับสู่แชท</button>
+</div>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-icon">🎖️</div>
+  <div>
+    <div class="hdr-title">รายงานรวมแถว</div>
+    <div class="hdr-sub" id="hdr-unit">กองพันทหารปืนใหญ่ที่ 5</div>
+  </div>
+  <div class="badge" id="badge-name">...</div>
+</div>
+
+<div class="content">
+  <!-- STEPS -->
+  <div class="steps">
+    <div class="step active" id="step1"><span class="step-num">1</span>สถานะ</div>
+    <div class="step"        id="step2"><span class="step-num">2</span>รายละเอียด</div>
+    <div class="step"        id="step3"><span class="step-num">3</span>ยืนยัน</div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="sbar info hidden" id="sbar">
+    <span id="sbar-icon">ℹ️</span>
+    <span id="sbar-txt"></span>
+  </div>
+
+  <!-- ====== STEP 1: เลือกสถานะ ====== -->
+  <div id="sec-step1">
+    <!-- Clock -->
+    <div class="clock-pill">
+      <div>
+        <div class="clock-time" id="clock-time">--:--</div>
+        <div id="clock-date" style="font-size:11px;color:var(--muted);margin-top:1px">--</div>
+      </div>
+      <div class="clock-status open" id="clock-status">รับรายงาน</div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">📌 สถานะการรวมแถว</div>
+      <div class="card-body">
+        <!-- ข้อมูลกำลังพล -->
+        <div style="background:var(--surface2);border-radius:10px;padding:12px;display:flex;align-items:center;gap:12px">
+          <div style="width:44px;height:44px;border-radius:50%;border:2px solid var(--gold);background:rgba(226,168,41,.1);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;overflow:hidden" id="soldier-avatar">🪖</div>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--text)" id="soldier-name">กำลังโหลด...</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px" id="soldier-sub">กำลังพล</div>
+          </div>
+        </div>
+
+        <!-- Choice cards -->
+        <div class="choice-grid">
+          <div class="choice-card present" id="card-present" onclick="selStatus('มา')">
+            <span class="ci">✅</span>
+            <div class="cl">มารวมแถว</div>
+            <div class="cs">ปกติ / พร้อม</div>
+          </div>
+          <div class="choice-card absent" id="card-absent" onclick="selStatus('ไม่มา')">
+            <span class="ci">❌</span>
+            <div class="cl">ไม่มารวมแถว</div>
+            <div class="cs">พร้อมแจ้งเหตุผล</div>
+          </div>
+        </div>
+
+        <!-- Warning: เกินเวลา -->
+        <div class="sbar warning hidden" id="overtime-warn">
+          ⚠️ เกินเวลา 08:00 น. — รายงานจะถูกบันทึกว่า "เกินเวลา"
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-secondary hidden" id="btn-next1" onclick="goStep2()">ถัดไป: ระบุเหตุผล ➜</button>
+    <!-- กด "มา" ไป step 3 ตรงๆ -->
+  </div>
+
+  <!-- ====== STEP 2: เหตุผล (เฉพาะ "ไม่มา") ====== -->
+  <div id="sec-step2" class="hidden">
+    <div class="card">
+      <div class="card-hdr" style="color:var(--red)">📝 เหตุผลที่ไม่มารวมแถว</div>
+      <div class="card-body">
+        <div class="field">
+          <label>เลือกเหตุผล <span style="color:var(--red)">*</span></label>
+          <div class="chips" id="reason-chips">
+            <button class="chip" onclick="selChip(this,'ลาป่วย')">🏥 ลาป่วย</button>
+            <button class="chip" onclick="selChip(this,'ลากิจ')">📋 ลากิจ</button>
+            <button class="chip" onclick="selChip(this,'ลาพักผ่อน')">🏖 ลาพักผ่อน</button>
+            <button class="chip" onclick="selChip(this,'เวรยาม')">🛡 เวรยาม</button>
+            <button class="chip" onclick="selChip(this,'ปฏิบัติภารกิจนอกหน่วย')">🚗 ภารกิจนอกหน่วย</button>
+            <button class="chip" onclick="selChip(this,'อบรม/สัมมนา')">📚 อบรม</button>
+            <button class="chip" onclick="selChip(this,'อื่นๆ')">✏️ อื่นๆ</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>รายละเอียดเพิ่มเติม</label>
+          <textarea id="f-reason" rows="2" placeholder="ระบุรายละเอียด..." oninput="checkStep2()"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-back" onclick="goStep1()">← กลับ</button>
+      <button class="btn btn-absent" id="btn-next2" onclick="goStep3()" disabled>ถัดไป: ยืนยัน ➜</button>
+    </div>
+  </div>
+
+  <!-- ====== STEP 3: ยืนยัน ====== -->
+  <div id="sec-step3" class="hidden">
+    <div class="confirm-panel">
+      <div class="confirm-hdr" id="confirm-hdr">✅ ตรวจสอบข้อมูลก่อนบันทึก</div>
+      <div class="confirm-row"><div class="confirm-key">ยศ ชื่อ-สกุล</div><div class="confirm-val" id="c-name">—</div></div>
+      <div class="confirm-row"><div class="confirm-key">วันที่</div><div class="confirm-val" id="c-date">—</div></div>
+      <div class="confirm-row"><div class="confirm-key">สถานะ</div><div class="confirm-val" id="c-status">—</div></div>
+      <div class="confirm-row" id="c-reason-row"><div class="confirm-key">เหตุผล</div><div class="confirm-val" id="c-reason">—</div></div>
+      <div class="confirm-row"><div class="confirm-key">เวลา</div><div class="confirm-val" id="c-time" style="font-family:'IBM Plex Mono',monospace">—</div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-back" id="btn-back3" onclick="goStep2()">← แก้ไข</button>
+      <button class="btn" id="btn-submit" onclick="submitReport()">📋 บันทึกรายงาน</button>
+    </div>
+  </div>
+
+</div><!-- end .content -->
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const LIFF_ID = 'YOUR_LIFF_REPORT_ID';       // ← ใส่ LIFF ID
+const GAS_URL = 'YOUR_GAS_WEB_APP_URL_HERE'; // ← ใส่ GAS URL
+
+// ============================================================
+// STATE
+// ============================================================
+const S = {
+  status: '',       // 'มา' | 'ไม่มา'
+  chip:   '',       // เหตุผลที่เลือก
+  userId: '',
+  fullName: '',
+  lineDisplayName: '',
+};
+const $ = id => document.getElementById(id);
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  startClock();
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+
+    const p  = await liff.getProfile();
+    S.userId          = p.userId;
+    S.lineDisplayName = p.displayName;
+    $('badge-name').textContent = p.displayName;
+
+    setLoad('กำลังโหลดข้อมูลกำลังพล...');
+
+    // ดึงชื่อจาก Sheet (ไม่ต้องตรวจสิทธิ์ — กำลังพลทุกคนใช้ได้)
+    const prof = await fetchProfile(p.userId);
+    if (prof.found) {
+      S.fullName = prof.soldier.fullName;
+      $('soldier-name').textContent = prof.soldier.fullName;
+      $('soldier-sub').textContent  = 'กำลังพล ' + (prof.soldier.status || 'ปกติ');
+    } else {
+      S.fullName = p.displayName;
+      $('soldier-name').textContent = p.displayName;
+      $('soldier-sub').innerHTML    = '<span style="color:var(--yellow)">⚠️ ยังไม่ได้ลงทะเบียน</span>';
+      setSbar('warning', '⚠️ ท่านยังไม่ได้ลงทะเบียน — ชื่อในรายงานจะใช้ชื่อ LINE แทน');
+    }
+
+    if (p.pictureUrl) {
+      $('soldier-avatar').innerHTML = '<img src="' + p.pictureUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+    }
+
+    // เช็คว่ารายงานแล้วหรือยัง
+    await checkAlreadyReported(p.userId);
+
+    show('main');
+  } catch(e) {
+    setLoad('❌ ' + e.message);
+    setTimeout(() => show('main'), 1500);
+  }
+}
+
+async function fetchProfile(userId) {
+  try {
+    const r = await fetch(GAS_URL + '?action=getProfile&lineId=' + encodeURIComponent(userId));
+    return r.ok ? await r.json() : { found: false };
+  } catch(e) { return { found: false }; }
+}
+
+async function checkAlreadyReported(userId) {
+  try {
+    const today = getTodayStr();
+    const r     = await fetch(GAS_URL + '?action=getSummary&date=' + today);
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data.detail) {
+      const mine = data.detail.find(d => d.lineId === userId);
+      if (mine) {
+        const icon = mine.status === 'มา' ? '✅' : '❌';
+        setSbar('info', icon + ' รายงานแล้ว: ' + mine.status + ' เวลา ' + mine.time + ' น. (' + mine.onTime + ')\nกดเพื่อแก้ไขได้');
+      }
+    }
+  } catch(e) {}
+}
+
+function show(s) {
+  $('ov-load').classList.add('hidden');
+  if (s !== 'main') $('ov-' + s).classList.remove('hidden');
+}
+function setLoad(t) { $('load-txt').textContent = t; }
+
+// ============================================================
+// CLOCK
+// ============================================================
+function startClock() {
+  const update = () => {
+    const bkk  = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+    const h    = String(bkk.getHours()).padStart(2,'0');
+    const m    = String(bkk.getMinutes()).padStart(2,'0');
+    const days = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+    const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+    $('clock-time').textContent = h + ':' + m;
+    $('clock-date').textContent = 'วัน' + days[bkk.getDay()] + 'ที่ ' + bkk.getDate() + ' ' + months[bkk.getMonth()] + ' ' + (bkk.getFullYear() + 543);
+
+    const isOpen = bkk.getHours() < 8;
+    $('clock-status').textContent = isOpen ? 'รับรายงาน' : 'เกินเวลา';
+    $('clock-status').className   = 'clock-status ' + (isOpen ? 'open' : 'closed');
+    $('overtime-warn').classList.toggle('hidden', isOpen);
+  };
+  update();
+  setInterval(update, 1000);
+}
+
+// ============================================================
+// STEP 1: เลือกสถานะ
+// ============================================================
+function selStatus(status) {
+  S.status = status;
+  $('card-present').classList.toggle('sel', status === 'มา');
+  $('card-absent').classList.toggle('sel',  status === 'ไม่มา');
+  clearSbar();
+
+  if (status === 'มา') {
+    // ข้าม step 2 ไป step 3 ตรงๆ
+    goStep3();
+  } else {
+    $('btn-next1').classList.remove('hidden');
+    goStep2();
+  }
+}
+
+// ============================================================
+// STEP 2: เหตุผล
+// ============================================================
+function selChip(el, val) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+  S.chip = val;
+  if (val === 'อื่นๆ') $('f-reason').focus();
+  checkStep2();
+}
+
+function checkStep2() {
+  const hasChip   = !!S.chip;
+  const hasReason = $('f-reason').value.trim().length > 0;
+  $('btn-next2').disabled = !(hasChip || hasReason);
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    const el = $('step'+i);
+    el.classList.remove('active','done');
+    if (i < n) el.classList.add('done');
+    else if (i === n) el.classList.add('active');
+  });
+}
+
+function goStep1() {
+  $('sec-step1').classList.remove('hidden');
+  $('sec-step2').classList.add('hidden');
+  $('sec-step3').classList.add('hidden');
+  $('btn-next1').classList.add('hidden');
+  S.status = ''; S.chip = '';
+  $('card-present').classList.remove('sel');
+  $('card-absent').classList.remove('sel');
+  clearSbar(); setStep(1);
+}
+
+function goStep2() {
+  if (!S.status) return;
+  $('sec-step1').classList.add('hidden');
+  $('sec-step2').classList.remove('hidden');
+  $('sec-step3').classList.add('hidden');
+  setStep(2); clearSbar(); checkStep2();
+}
+
+function goStep3() {
+  if (!S.status) { setSbar('error','❌ กรุณาเลือกสถานะก่อน'); return; }
+  if (S.status === 'ไม่มา') {
+    const reason = $('f-reason').value.trim() || S.chip;
+    if (!reason) { setSbar('error','❌ กรุณาระบุเหตุผล'); return; }
+  }
+
+  const now    = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+  const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  const reason  = S.status === 'มา' ? '' : ($('f-reason').value.trim() || S.chip);
+
+  // ── ยืนยัน ──
+  $('c-name').textContent   = S.fullName;
+  $('c-date').textContent   = getTodayStr();
+  $('c-status').textContent = S.status;
+  $('c-time').textContent   = timeStr + ' น.';
+  if (S.status === 'ไม่มา') {
+    $('c-reason').textContent = reason;
+    $('c-reason-row').style.display = '';
+  } else {
+    $('c-reason-row').style.display = 'none';
+  }
+
+  const isPresent = S.status === 'มา';
+  const hdr = $('confirm-hdr');
+  hdr.textContent = isPresent ? '✅ ยืนยันมารวมแถว' : '❌ ยืนยันไม่มารวมแถว';
+  hdr.style.background = isPresent ? 'rgba(0,200,83,.1)' : 'rgba(248,81,73,.08)';
+  hdr.style.color       = isPresent ? 'var(--green)' : 'var(--red)';
+
+  const submitBtn = $('btn-submit');
+  submitBtn.textContent = isPresent ? '✅ ยืนยันมารวมแถว' : '❌ ยืนยันไม่มารวมแถว';
+  submitBtn.style.background = isPresent ? 'var(--green)' : 'var(--red)';
+  submitBtn.style.color      = isPresent ? '#000' : '#fff';
+
+  // ปุ่ม "← แก้ไข" ควรกลับไปไหน
+  $('btn-back3').onclick = S.status === 'มา' ? goStep1 : goStep2;
+
+  $('sec-step1').classList.add('hidden');
+  $('sec-step2').classList.add('hidden');
+  $('sec-step3').classList.remove('hidden');
+  setStep(3); clearSbar();
+}
+
+// ============================================================
+// SUBMIT
+// ============================================================
+async function submitReport() {
+  const btn    = $('btn-submit');
+  btn.disabled = true;
+  btn.textContent = '⏳ กำลังบันทึก...';
+
+  const reason  = S.status === 'มา' ? '' : ($('f-reason').value.trim() || S.chip);
+  const payload = {
+    action:  'liff_submit',
+    userId:  S.userId,
+    fullName: S.fullName,
+    status:  S.status,
+    reason:  reason || '-',
+  };
+
+  try {
+    // ลอง sendMessages ก่อน (เหมือน liff-scanner)
+    await liff.sendMessages([{
+      type: 'text',
+      text: S.status + '\n' + (reason || '-') + '\n' + S.fullName
+    }]);
+    showSuccess(reason);
+  } catch(e) {
+    // Fallback: POST ไป GAS โดยตรง (เหมือน handleLiffSubmit ในระบบพัสดุ)
+    try {
+      const form = new FormData();
+      form.append('payload', JSON.stringify(payload));
+      const resp = await fetch(GAS_URL, { method: 'POST', body: form });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      if (data.status !== 'ok') throw new Error(data.message || 'บันทึกล้มเหลว');
+      showSuccess(reason, data.onTime);
+    } catch(e2) {
+      setSbar('error','❌ บันทึกไม่สำเร็จ: ' + e2.message);
+      btn.disabled = false;
+      btn.textContent = S.status === 'มา' ? '✅ ยืนยันมารวมแถว' : '❌ ยืนยันไม่มารวมแถว';
+    }
+  }
+}
+
+function showSuccess(reason, isOnTime) {
+  const isPresent = S.status === 'มา';
+  $('ok-title').textContent  = isPresent ? 'บันทึก: มารวมแถว ✅' : 'บันทึก: ไม่มารวมแถว ❌';
+  $('ok-name').textContent   = S.fullName;
+  $('ok-detail').textContent = isPresent
+    ? 'รายงานมารวมแถวเรียบร้อยแล้ว'
+    : 'เหตุผล: ' + (reason || '-');
+  $('ov-load').classList.add('hidden');
+  $('ov-ok').classList.remove('hidden');
+}
+
+// ============================================================
+// RESET
+// ============================================================
+function resetAll() {
+  S.status = ''; S.chip = '';
+  $('ov-ok').classList.add('hidden');
+  $('f-reason').value = '';
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('sel'));
+  goStep1(); clearSbar();
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function setSbar(type, text) {
+  if (!type) { clearSbar(); return; }
+  const b = $('sbar');
+  b.className = 'sbar ' + type;
+  b.classList.remove('hidden');
+  $('sbar-icon').textContent = { error:'❌', success:'✅', info:'ℹ️', warning:'⚠️' }[type] || 'ℹ️';
+  $('sbar-txt').textContent  = text;
+}
+function clearSbar() { $('sbar').classList.add('hidden'); }
+
+function getTodayStr() {
+  const bkk = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+  return String(bkk.getDate()).padStart(2,'0') + '/' +
+         String(bkk.getMonth()+1).padStart(2,'0') + '/' + bkk.getFullYear();
+}
+
+init();
+</script>
+</body>
+</html>
