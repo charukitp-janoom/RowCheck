@@ -502,32 +502,24 @@ async function submitReport() {
     reason:  reason || '-',
   };
 
-  // ส่ง sendMessages เฉพาะเมื่ออยู่ใน LINE app จริงๆ
-  if (liff.isInClient()) {
-    try {
-      await liff.sendMessages([{
-        type: 'text',
-        text: S.status + '\n' + (reason || '-') + '\n' + S.fullName
-      }]);
-      showSuccess(reason);
-      return;
-    } catch(e) {
-      console.warn('sendMessages failed, fallback POST:', e.message);
-    }
+  // ── วิธีหลัก: sendMessages ผ่าน LINE Chat ──
+  // GAS รับใน handleTextMessage → parse สถานะ/เหตุผล
+  try {
+    const msgText = S.status === 'มา'
+      ? 'มา'
+      : ('เหตุผล:' + (reason || '-'));
+    await liff.sendMessages([{ type:'text', text: msgText }]);
+    showSuccess(reason);
+    return;
+  } catch(sendErr) {
+    console.warn('sendMessages failed:', sendErr.message);
   }
 
-  // Fallback: POST JSON ตรงไป GAS
+  // ── Fallback: XHR text/plain (หลีกเลี่ยง CORS preflight) ──
   try {
-    const resp = await fetch(GAS_URL, {
-      method:   'POST',
-      redirect: 'follow',
-      headers:  { 'Content-Type': 'application/json' },
-      body:     JSON.stringify(payload),
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    if (data.status !== 'ok') throw new Error(data.message || 'บันทึกล้มเหลว');
-    showSuccess(reason, data.onTime);
+    const result = await xhrPost(GAS_URL, payload);
+    if (result.status !== 'ok') throw new Error(result.message || 'บันทึกล้มเหลว');
+    showSuccess(reason, result.onTime);
   } catch(e2) {
     console.error('submitReport error:', e2);
     setSbar('error','❌ บันทึกไม่สำเร็จ: ' + e2.message);
@@ -575,6 +567,22 @@ function getTodayStr() {
   const bkk = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
   return String(bkk.getDate()).padStart(2,'0') + '/' +
          String(bkk.getMonth()+1).padStart(2,'0') + '/' + bkk.getFullYear();
+}
+
+function xhrPost(url, data) {
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Content-Type', 'text/plain;charset=UTF-8');
+    xhr.onload  = function() {
+      try { resolve(JSON.parse(xhr.responseText)); }
+      catch(e) { reject(new Error('Parse error: ' + xhr.responseText.substring(0,100))); }
+    };
+    xhr.onerror   = function() { reject(new Error('Network error')); };
+    xhr.ontimeout = function() { reject(new Error('Timeout')); };
+    xhr.timeout   = 15000;
+    xhr.send(JSON.stringify(data));
+  });
 }
 
 init();
