@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>รายงานรวมแถว</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
+:root{
+  --bg:#0d1117;--sur:#161b22;--sur2:#21262d;--bdr:#30363d;
+  --txt:#e6edf3;--mut:#7d8590;--grn:#00c853;--grn2:#009624;
+  --red:#f85149;--yel:#d29922;--blu:#388bfd;--gld:#e2a829;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+.ov{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:40px;text-align:center;z-index:999}
+.ov.hidden{display:none}
+.ov-icon{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px}
+.ov-icon.spin{background:rgba(56,139,253,.1);border:2px solid var(--blu);animation:pulse 1.5s infinite}
+.ov-icon.ok{background:rgba(0,200,83,.15);border:2px solid var(--grn)}
+.ov-title{font-size:19px;font-weight:700}
+.ov-title.blue{color:var(--blu)}.ov-title.green{color:var(--grn)}
+.ok-card{background:var(--sur);border:1px solid var(--bdr);border-radius:11px;padding:14px 18px;width:100%;max-width:300px;text-align:left}
+.ok-card .lbl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.ok-card .val{font-size:15px;font-weight:600}
+.ok-note{font-size:13px;color:var(--grn);background:rgba(0,200,83,.08);border:1px solid rgba(0,200,83,.25);border-radius:8px;padding:10px 14px;width:100%;max-width:300px;line-height:1.6}
+.hdr{background:var(--sur);border-bottom:1px solid var(--bdr);padding:13px 18px;display:flex;align-items:center;gap:11px;position:sticky;top:0;z-index:100}
+.hdr-ic{width:34px;height:34px;background:linear-gradient(135deg,var(--gld),#b45309);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.hdr-name{font-size:15px;font-weight:700}
+.hdr-sub{font-size:11px;color:var(--mut)}
+.badge{margin-left:auto;background:var(--sur2);border:1px solid var(--bdr);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--mut);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.body{padding:18px 15px 40px;max-width:480px;margin:0 auto}
+.steps{display:flex;background:var(--sur);border:1px solid var(--bdr);border-radius:11px;overflow:hidden;margin-bottom:20px}
+.step{flex:1;padding:9px 4px;text-align:center;font-size:11px;color:var(--mut);border-right:1px solid var(--bdr)}
+.step:last-child{border-right:none}
+.step.active{background:rgba(226,168,41,.08);color:var(--gld);font-weight:600}
+.step.done{color:var(--grn)}
+.step-n{display:block;font-size:15px;font-weight:700;font-family:'IBM Plex Mono',monospace;margin-bottom:2px}
+.clock-pill{display:flex;align-items:center;justify-content:space-between;background:var(--sur);border:1px solid var(--bdr);border-radius:9px;padding:9px 13px;margin-bottom:14px}
+.clock-time{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;color:var(--gld)}
+.clock-date{font-size:11px;color:var(--mut);margin-top:1px}
+.clock-badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
+.clock-badge.open {background:rgba(0,200,83,.12);color:var(--grn);border:1px solid rgba(0,200,83,.25)}
+.clock-badge.over {background:rgba(248,81,73,.12);color:var(--red);border:1px solid rgba(248,81,73,.25)}
+.sbar{border-radius:9px;padding:11px 13px;font-size:13px;display:flex;gap:8px;align-items:flex-start;margin-bottom:14px;line-height:1.5}
+.sbar.hidden{display:none}
+.sbar.err{background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);color:var(--red)}
+.sbar.ok{background:rgba(0,200,83,.08);border:1px solid rgba(0,200,83,.25);color:var(--grn)}
+.sbar.warn{background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.25);color:var(--yel)}
+.sbar.info{background:rgba(56,139,253,.08);border:1px solid rgba(56,139,253,.25);color:var(--blu)}
+.card{background:var(--sur);border:1px solid var(--bdr);border-radius:14px;overflow:hidden;margin-bottom:14px}
+.card-h{padding:12px 15px;border-bottom:1px solid var(--bdr);font-size:13px;font-weight:600}
+.card-b{padding:14px 15px;display:flex;flex-direction:column;gap:12px}
+.soldier-row{background:var(--sur2);border-radius:9px;padding:11px 13px;display:flex;align-items:center;gap:11px}
+.soldier-avatar{width:42px;height:42px;border-radius:50%;border:2px solid var(--gld);background:rgba(226,168,41,.1);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;overflow:hidden}
+.soldier-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.soldier-name{font-size:15px;font-weight:700}
+.soldier-sub{font-size:12px;color:var(--mut);margin-top:2px}
+.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.choice-card{background:var(--sur2);border:2px solid var(--bdr);border-radius:13px;padding:18px 8px;text-align:center;cursor:pointer;transition:.18s;user-select:none}
+.choice-card:active{transform:scale(.96)}
+.ci{font-size:34px;display:block;margin-bottom:7px;line-height:1}
+.cl{font-size:15px;font-weight:700}
+.cs{font-size:11px;color:var(--mut);margin-top:3px}
+.choice-card.present.sel{border-color:var(--grn);background:rgba(0,200,83,.08)}
+.choice-card.present.sel .cl{color:var(--grn)}
+.choice-card.absent.sel{border-color:var(--red);background:rgba(248,81,73,.06)}
+.choice-card.absent.sel .cl{color:var(--red)}
+.overtime-warn{display:none;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);border-radius:9px;padding:10px 13px;font-size:13px;color:var(--red);margin-top:4px}
+.overtime-warn.show{display:block}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px}
+.chip{font-family:'Sarabun',sans-serif;font-size:13px;font-weight:600;padding:7px 13px;border-radius:20px;border:1.5px solid var(--bdr);background:transparent;color:var(--txt);cursor:pointer;transition:.15s}
+.chip.sel{background:rgba(226,168,41,.12);border-color:var(--gld);color:var(--gld)}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
+textarea{width:100%;background:var(--bg);border:1px solid var(--bdr);border-radius:7px;padding:10px 13px;font-family:'Sarabun',sans-serif;font-size:15px;color:var(--txt);outline:none;transition:.2s;resize:none;-webkit-appearance:none}
+textarea:focus{border-color:var(--gld)}
+textarea::placeholder{color:var(--mut)}
+.cp-panel{background:var(--sur);border:1px solid rgba(0,200,83,.3);border-radius:14px;overflow:hidden;margin-bottom:14px}
+.cp-h{padding:12px 15px;font-weight:700;font-size:13px;border-bottom:1px solid rgba(0,200,83,.2)}
+.cp-row{display:flex;padding:10px 15px;border-bottom:1px solid var(--bdr);gap:10px}
+.cp-row:last-child{border-bottom:none}
+.cp-k{font-size:11px;color:var(--mut);width:80px;flex-shrink:0;padding-top:2px}
+.cp-v{font-size:13px;font-weight:500;word-break:break-all}
+.btn{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:13px;border:none;border-radius:9px;font-family:'Sarabun',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:.18s;-webkit-appearance:none}
+.btn:active{transform:scale(.97)}
+.btn-present{background:var(--grn);color:#000}
+.btn-absent{background:var(--red);color:#fff}
+.btn-secondary{background:var(--sur2);color:var(--txt);border:1px solid var(--bdr)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-row{display:flex;gap:7px}
+.btn-row .btn-back{flex:0 0 auto;width:auto;padding:13px 18px}
+.hidden{display:none!important}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(1.06)}}
+</style>
+</head>
+<body>
+
+<div id="ov-load" class="ov">
+  <div class="ov-icon spin">🎖️</div>
+  <div class="ov-title blue" id="ov-txt">กำลังโหลด...</div>
+</div>
+
+<div id="ov-ok" class="ov hidden">
+  <div class="ov-icon ok">✅</div>
+  <div class="ov-title green" id="ok-title">บันทึกสำเร็จ!</div>
+  <div class="ok-card">
+    <div class="lbl">ยศ ชื่อ-สกุล</div>
+    <div class="val" id="ok-name">—</div>
+  </div>
+  <div class="ok-note" id="ok-detail">—</div>
+  <button class="btn btn-secondary" style="max-width:240px" onclick="resetAll()">🔄 รายงานใหม่</button>
+  <button class="btn btn-present"   style="max-width:240px" onclick="liff.closeWindow()">✔️ ปิดกลับสู่แชท</button>
+</div>
+
+<div class="hdr">
+  <div class="hdr-ic">🎖️</div>
+  <div><div class="hdr-name">รายงานรวมแถว</div><div class="hdr-sub">กองพันทหารปืนใหญ่ที่ 5</div></div>
+  <div class="badge" id="badge">...</div>
+</div>
+
+<div class="body">
+  <div class="steps">
+    <div class="step active" id="s1"><span class="step-n">1</span>สถานะ</div>
+    <div class="step"        id="s2"><span class="step-n">2</span>รายละเอียด</div>
+    <div class="step"        id="s3"><span class="step-n">3</span>ยืนยัน</div>
+  </div>
+  <div class="sbar hidden" id="sbar"><span id="sbar-ic">ℹ️</span><span id="sbar-txt"></span></div>
+
+  <!-- STEP 1 -->
+  <div id="sec1">
+    <div class="clock-pill">
+      <div>
+        <div class="clock-time" id="clock">--:--</div>
+        <div class="clock-date" id="clock-date">--</div>
+      </div>
+      <div class="clock-badge open" id="clock-badge">รับรายงาน</div>
+    </div>
+    <div class="card">
+      <div class="card-h">📌 สถานะการรวมแถว</div>
+      <div class="card-b">
+        <div class="soldier-row">
+          <div class="soldier-avatar" id="avatar">🪖</div>
+          <div>
+            <div class="soldier-name" id="soldier-name">กำลังโหลด...</div>
+            <div class="soldier-sub"  id="soldier-sub">กำลังพล</div>
+          </div>
+        </div>
+        <div class="choice-grid">
+          <div class="choice-card present" id="card-present" onclick="selStatus('มา')">
+            <span class="ci">✅</span>
+            <div class="cl">มารวมแถว</div>
+            <div class="cs" id="cs-present">ปกติ / พร้อม</div>
+          </div>
+          <div class="choice-card absent" id="card-absent" onclick="selStatus('ไม่มา')">
+            <span class="ci">❌</span>
+            <div class="cl">ไม่มารวมแถว</div>
+            <div class="cs">พร้อมแจ้งเหตุผล</div>
+          </div>
+        </div>
+        <div class="overtime-warn" id="ot-warn">⚠️ เกินเวลา 08:20 น. — ต้องระบุเหตุผลทุกกรณี</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div id="sec2" class="hidden">
+    <div class="card">
+      <div class="card-h" id="reason-hdr" style="color:var(--red)">📝 เหตุผลที่ไม่มารวมแถว</div>
+      <div class="card-b">
+        <div class="fld">
+          <label>เลือกเหตุผล <span style="color:var(--red)">*</span></label>
+          <div class="chips" id="chips">
+            <button class="chip" onclick="selChip(this,'ลาป่วย')">🏥 ลาป่วย</button>
+            <button class="chip" onclick="selChip(this,'ลากิจ')">📋 ลากิจ</button>
+            <button class="chip" onclick="selChip(this,'ลาพักผ่อน')">🏖 ลาพักผ่อน</button>
+            <button class="chip" onclick="selChip(this,'เวรยาม')">🛡 เวรยาม</button>
+            <button class="chip" onclick="selChip(this,'ปฏิบัติภารกิจนอกหน่วย')">🚗 ภารกิจนอกหน่วย</button>
+            <button class="chip" onclick="selChip(this,'อบรม/สัมมนา')">📚 อบรม</button>
+            <button class="chip" onclick="selChip(this,'อื่นๆ')">✏️ อื่นๆ</button>
+          </div>
+        </div>
+        <div class="fld">
+          <label>รายละเอียดเพิ่มเติม</label>
+          <textarea id="f-reason" rows="2" placeholder="ระบุรายละเอียด..." oninput="chkStep2()"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-back" onclick="goS1()">← กลับ</button>
+      <button class="btn btn-absent" id="btn-next2" onclick="goS3()" disabled>ถัดไป ➜</button>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div id="sec3" class="hidden">
+    <div class="cp-panel">
+      <div class="cp-h" id="cp-hdr" style="background:rgba(0,200,83,.08);color:var(--grn)">✅ ตรวจสอบก่อนบันทึก</div>
+      <div class="cp-row"><div class="cp-k">ยศ ชื่อ-สกุล</div><div class="cp-v" id="c-name">—</div></div>
+      <div class="cp-row"><div class="cp-k">วันที่</div>       <div class="cp-v" id="c-date">—</div></div>
+      <div class="cp-row"><div class="cp-k">สถานะ</div>        <div class="cp-v" id="c-status">—</div></div>
+      <div class="cp-row" id="c-reason-row"><div class="cp-k">เหตุผล</div><div class="cp-v" id="c-reason">—</div></div>
+      <div class="cp-row"><div class="cp-k">เวลา</div>         <div class="cp-v" id="c-time" style="font-family:'IBM Plex Mono',monospace">—</div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-back" id="btn-back3" onclick="goS2()">← แก้ไข</button>
+      <button class="btn" id="btn-save" onclick="save()">📋 บันทึกรายงาน</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const GAS     = 'https://script.google.com/macros/s/AKfycbysLsr3aCrhOiJTXmHgQD7h1LfpDwmke180LI-PXVmzclvgL6hCptxJJBNFp7Z3PQXDsw/exec';
+const LIFF_ID = '2009558606-O5aQlngY';
+const CUTOFF_H = 8, CUTOFF_M = 20;
+const S = { status:'', chip:'', uid:'', fullName:'', alias:'' };
+const $ = id => document.getElementById(id);
+
+// ── clock ──
+function startClock() {
+  const update = () => {
+    const bkk   = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Bangkok'}));
+    const hh    = String(bkk.getHours()).padStart(2,'0');
+    const mm    = String(bkk.getMinutes()).padStart(2,'0');
+    const days  = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+    const months= ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    $('clock').textContent      = hh + ':' + mm;
+    $('clock-date').textContent = 'วัน'+days[bkk.getDay()]+'ที่ '+bkk.getDate()+' '+months[bkk.getMonth()]+' '+(bkk.getFullYear()+543);
+    const open = bkk.getHours() < CUTOFF_H || (bkk.getHours()===CUTOFF_H && bkk.getMinutes()<CUTOFF_M);
+    $('clock-badge').textContent  = open ? 'รับรายงาน' : 'เกินเวลา';
+    $('clock-badge').className    = 'clock-badge ' + (open ? 'open' : 'over');
+    $('ot-warn').classList.toggle('show', !open);
+    $('cs-present').textContent   = open ? 'ปกติ / พร้อม' : 'ต้องระบุเหตุผล';
+  };
+  update(); setInterval(update, 1000);
+}
+
+async function init() {
+  startClock();
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+    const p = await liff.getProfile();
+    S.uid = p.userId; S.alias = p.displayName;
+    $('badge').textContent = p.displayName;
+    if (p.pictureUrl) $('avatar').innerHTML = '<img src="'+p.pictureUrl+'">';
+    $('ov-txt').textContent = 'กำลังโหลดข้อมูล...';
+    const prof = await xhrGet(GAS + '?action=getProfile&uid=' + encodeURIComponent(p.userId));
+    if (prof.found) {
+      S.fullName = prof.soldier.fullName;
+      $('soldier-name').textContent = prof.soldier.fullName;
+      $('soldier-sub').textContent  = 'กำลังพล';
+    } else {
+      S.fullName = p.displayName;
+      $('soldier-name').textContent = p.displayName;
+      $('soldier-sub').innerHTML    = '<span style="color:var(--yel)">⚠️ ยังไม่ลงทะเบียน</span>';
+      showSbar('warn','⚠️ ยังไม่ลงทะเบียน ชื่อในรายงานจะใช้ชื่อ LINE แทน');
+    }
+    // เช็คว่ารายงานแล้วหรือยัง
+    try {
+      const today = getTodayStr();
+      const sum   = await xhrGet(GAS + '?action=getSummary&date=' + today);
+      if (sum.detail) {
+        const mine = sum.detail.find(d => d.uid === S.uid);
+        if (mine) showSbar('info','ℹ️ รายงานแล้ว: '+mine.status+' เวลา '+mine.time+' น. ('+mine.onTime+') — กดเพื่อแก้ไขได้');
+      }
+    } catch(e){}
+    $('ov-load').classList.add('hidden');
+  } catch(e) {
+    $('ov-txt').textContent = '❌ ' + e.message;
+    setTimeout(()=>{ $('ov-load').classList.add('hidden'); }, 1500);
+  }
+}
+
+function selStatus(status) {
+  S.status = status;
+  $('card-present').classList.toggle('sel', status==='มา');
+  $('card-absent').classList.toggle('sel',  status==='ไม่มา');
+  clearSbar();
+  const bkk  = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Bangkok'}));
+  const open = bkk.getHours() < CUTOFF_H || (bkk.getHours()===CUTOFF_H && bkk.getMinutes()<CUTOFF_M);
+  if (status === 'มา' && open) { goS3(); }
+  else {
+    // มาแต่สาย หรือ ไม่มา → ต้องผ่าน step 2
+    const hdr = $('reason-hdr');
+    if (status === 'มา' && !open) {
+      hdr.textContent = '📝 เหตุผลที่มาสาย (หลัง 08:20 น.)';
+      hdr.style.color = 'var(--yel)';
+      $('chips').innerHTML =
+        '<button class="chip" onclick="selChip(this,\'มาสาย\')">⏰ มาสาย</button>' +
+        '<button class="chip" onclick="selChip(this,\'ภารกิจก่อนหน้า\')">🚗 ภารกิจก่อนหน้า</button>' +
+        '<button class="chip" onclick="selChip(this,\'เหตุฉุกเฉิน\')">🚨 เหตุฉุกเฉิน</button>' +
+        '<button class="chip" onclick="selChip(this,\'อื่นๆ\')">✏️ อื่นๆ</button>';
+    } else {
+      hdr.textContent = '📝 เหตุผลที่ไม่มารวมแถว';
+      hdr.style.color = 'var(--red)';
+      $('chips').innerHTML =
+        '<button class="chip" onclick="selChip(this,\'ลาป่วย\')">🏥 ลาป่วย</button>' +
+        '<button class="chip" onclick="selChip(this,\'ลากิจ\')">📋 ลากิจ</button>' +
+        '<button class="chip" onclick="selChip(this,\'ลาพักผ่อน\')">🏖 ลาพักผ่อน</button>' +
+        '<button class="chip" onclick="selChip(this,\'เวรยาม\')">🛡 เวรยาม</button>' +
+        '<button class="chip" onclick="selChip(this,\'ปฏิบัติภารกิจนอกหน่วย\')">🚗 ภารกิจนอกหน่วย</button>' +
+        '<button class="chip" onclick="selChip(this,\'อบรม/สัมมนา\')">📚 อบรม</button>' +
+        '<button class="chip" onclick="selChip(this,\'อื่นๆ\')">✏️ อื่นๆ</button>';
+    }
+    goS2();
+  }
+}
+
+function selChip(el, val) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel'); S.chip = val;
+  if (val === 'อื่นๆ') $('f-reason').focus();
+  chkStep2();
+}
+function chkStep2() {
+  $('btn-next2').disabled = !(S.chip || $('f-reason').value.trim().length > 0);
+}
+
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    const el = $('s'+i); el.classList.remove('active','done');
+    if (i < n) el.classList.add('done'); else if (i === n) el.classList.add('active');
+  });
+}
+
+function goS1() {
+  ['sec2','sec3'].forEach(x => $(x).classList.add('hidden'));
+  $('sec1').classList.remove('hidden');
+  S.status=''; S.chip='';
+  $('card-present').classList.remove('sel');
+  $('card-absent').classList.remove('sel');
+  $('f-reason').value='';
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));
+  clearSbar(); setStep(1);
+}
+function goS2() {
+  $('sec1').classList.add('hidden');
+  $('sec3').classList.add('hidden');
+  $('sec2').classList.remove('hidden');
+  setStep(2); clearSbar(); chkStep2();
+}
+function goS3() {
+  if (!S.status) { showSbar('err','กรุณาเลือกสถานะก่อน'); return; }
+  const bkk  = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Bangkok'}));
+  const open = bkk.getHours() < CUTOFF_H || (bkk.getHours()===CUTOFF_H && bkk.getMinutes()<CUTOFF_M);
+  const reason = S.status==='มา' && open ? '' : ($('f-reason').value.trim() || S.chip);
+  if ((S.status === 'ไม่มา' || (S.status === 'มา' && !open)) && !reason) {
+    showSbar('err','กรุณาระบุเหตุผล'); return;
+  }
+  const timeStr = String(bkk.getHours()).padStart(2,'0') + ':' + String(bkk.getMinutes()).padStart(2,'0');
+  $('c-name').textContent   = S.fullName;
+  $('c-date').textContent   = getTodayStr();
+  $('c-status').textContent = S.status;
+  $('c-time').textContent   = timeStr + ' น.';
+  if (reason) { $('c-reason').textContent = reason; $('c-reason-row').style.display=''; }
+  else        { $('c-reason-row').style.display='none'; }
+  const isPresent = S.status==='มา' && open;
+  const hdr = $('cp-hdr');
+  hdr.textContent = isPresent ? '✅ ยืนยันมารวมแถว' : (S.status==='ไม่มา' ? '❌ ยืนยันไม่มารวมแถว' : '⏰ ยืนยันมาสาย');
+  hdr.style.background = isPresent ? 'rgba(0,200,83,.08)' : S.status==='ไม่มา' ? 'rgba(248,81,73,.06)' : 'rgba(210,153,34,.08)';
+  hdr.style.color      = isPresent ? 'var(--grn)' : S.status==='ไม่มา' ? 'var(--red)' : 'var(--yel)';
+  const btn = $('btn-save');
+  btn.style.background = isPresent ? 'var(--grn)' : S.status==='ไม่มา' ? 'var(--red)' : '#b45309';
+  btn.style.color = isPresent ? '#000' : '#fff';
+  $('btn-back3').onclick = (S.status==='มา' && open) ? goS1 : goS2;
+  $('sec2').classList.add('hidden');
+  $('sec1').classList.add('hidden');
+  $('sec3').classList.remove('hidden');
+  setStep(3); clearSbar();
+}
+
+async function save() {
+  const btn = $('btn-save');
+  btn.disabled=true; btn.textContent='⏳ กำลังบันทึก...';
+  const bkk  = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Bangkok'}));
+  const open = bkk.getHours() < CUTOFF_H || (bkk.getHours()===CUTOFF_H && bkk.getMinutes()<CUTOFF_M);
+  const reason= S.status==='มา' && open ? '' : ($('f-reason').value.trim() || S.chip);
+  const payload = { action:'report', uid:S.uid, fullName:S.fullName, status:S.status, reason:reason||'-' };
+
+  // XHR primary
+  try {
+    const res = await xhrPost(GAS, payload);
+    if (!res.ok) throw new Error(res.msg||'ผิดพลาด');
+    showSuccess(reason, res.onTime, res.updated);
+    return;
+  } catch(e) { console.warn('XHR failed, try sendMessages:', e.message); }
+
+  // sendMessages fallback
+  try {
+    const msgText = '__REPORT__' + JSON.stringify({ status:S.status, reason:reason||'-', fullName:S.fullName });
+    await liff.sendMessages([{ type:'text', text:msgText }]);
+    showSuccess(reason, true, false);
+  } catch(e2) {
+    showSbar('err','❌ บันทึกไม่สำเร็จ: '+e2.message);
+    btn.disabled=false;
+    btn.textContent='📋 บันทึกรายงาน';
+  }
+}
+
+function showSuccess(reason, onTime, updated) {
+  const isPresent = S.status === 'มา';
+  $('ok-title').textContent  = updated ? 'อัปเดตสำเร็จ!' : 'บันทึกสำเร็จ!';
+  $('ok-name').textContent   = S.fullName;
+  $('ok-detail').textContent = (isPresent ? '✅ มารวมแถว' : '❌ ไม่มารวมแถว')
+    + (reason ? '\nเหตุผล: ' + reason : '')
+    + '\n' + (onTime ? '🟢 ทันเวลา' : '🔴 เกินเวลา');
+  $('ov-ok').classList.remove('hidden');
+}
+
+function resetAll() {
+  $('ov-ok').classList.add('hidden');
+  $('f-reason').value=''; S.chip=''; S.status='';
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));
+  goS1(); clearSbar();
+}
+
+function getTodayStr() {
+  const b = new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Bangkok'}));
+  return String(b.getDate()).padStart(2,'0')+'/'+String(b.getMonth()+1).padStart(2,'0')+'/'+b.getFullYear();
+}
+function showSbar(type, txt) {
+  const b = $('sbar'); b.className='sbar '+type; b.classList.remove('hidden');
+  $('sbar-ic').textContent={err:'❌',ok:'✅',warn:'⚠️',info:'ℹ️'}[type]||'ℹ️';
+  $('sbar-txt').textContent=txt;
+}
+function clearSbar() { $('sbar').classList.add('hidden'); }
+function xhrGet(url) {
+  return new Promise((res,rej)=>{
+    const x=new XMLHttpRequest(); x.open('GET',url,true); x.timeout=15000;
+    x.onload=()=>{try{res(JSON.parse(x.responseText))}catch(e){rej(e)}};
+    x.onerror=()=>rej(new Error('Network error')); x.ontimeout=()=>rej(new Error('Timeout'));
+    x.send();
+  });
+}
+function xhrPost(url, data) {
+  return new Promise((res,rej)=>{
+    const x=new XMLHttpRequest(); x.open('POST',url,true);
+    x.setRequestHeader('Content-Type','text/plain;charset=UTF-8'); x.timeout=15000;
+    x.onload=()=>{try{res(JSON.parse(x.responseText))}catch(e){rej(e)}};
+    x.onerror=()=>rej(new Error('Network error')); x.ontimeout=()=>rej(new Error('Timeout'));
+    x.send(JSON.stringify(data));
+  });
+}
+init();
+</script>
+</body>
+</html>

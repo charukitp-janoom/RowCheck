@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin — เช็คยอดรวมแถว ป.5 พัน.5</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Teko:wght@500;600;700&display=swap');
+:root{
+  --bg:#070e0b;--card:#101c14;--card2:#162218;
+  --bdr:rgba(56,189,100,.13);--bdr2:rgba(56,189,100,.26);
+  --grn:#38bd64;--grn2:#22c55e;--grn3:#15803d;
+  --gld:#e2a829;--blu:#3b9eed;--red:#ef4444;
+  --mut:#3a6047;--mut2:#527a5e;--txt:#c8e6d0;--wht:#f0faf3;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans Thai',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+.layout{display:flex;min-height:100vh}
+/* sidebar */
+.sb{width:210px;flex-shrink:0;background:var(--card);border-right:1px solid var(--bdr);padding:18px 0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.sb-logo{padding:0 16px 16px;border-bottom:1px solid var(--bdr);text-align:center}
+.sb-logo .ico{font-size:24px}
+.sb-logo h2{font-family:'Teko',sans-serif;font-size:17px;font-weight:600;color:var(--grn);margin-top:4px}
+.sb-logo p{font-size:10px;color:var(--mut2)}
+.sb-nav{padding:12px 8px;flex:1}
+.nlbl{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--mut);padding:8px 8px 4px}
+.nitem{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;transition:.15s;border:none;background:none;width:100%;text-align:left;font-family:'IBM Plex Sans Thai',sans-serif;margin-bottom:1px}
+.nitem:hover,.nitem.active{background:rgba(56,189,100,.1);color:var(--grn)}
+.sb-foot{padding:12px 16px;border-top:1px solid var(--bdr);font-size:10px;color:var(--mut2);text-align:center}
+/* main */
+.main{flex:1;padding:22px;overflow-x:hidden;padding-bottom:80px}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.page-title{font-family:'Teko',sans-serif;font-size:26px;font-weight:600;color:var(--wht)}
+.page-title span{color:var(--grn)}
+.page-sub{font-size:12px;color:var(--mut2);margin-top:2px}
+.head-acts{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+input[type=date]{background:var(--card);border:1px solid var(--bdr2);border-radius:7px;color:var(--txt);font-family:'IBM Plex Sans Thai',sans-serif;font-size:13px;padding:7px 11px;cursor:pointer}
+/* buttons */
+.btn{padding:8px 14px;border:none;border-radius:7px;font-family:'IBM Plex Sans Thai',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:.18s;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--blu);color:#fff}
+.btn-csv{background:transparent;border:1px solid var(--bdr2);color:var(--txt)}
+.btn-csv:hover{background:rgba(56,189,100,.06)}
+.btn-line{background:linear-gradient(135deg,#06C755,#00a040);color:#fff;font-weight:700}
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--bdr);border-radius:12px;padding:14px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi.all::before    {background:linear-gradient(90deg,var(--blu),#60c8ff)}
+.kpi.pres::before   {background:linear-gradient(90deg,var(--grn3),var(--grn2))}
+.kpi.abs::before    {background:linear-gradient(90deg,#991b1b,var(--red))}
+.kpi.pend::before   {background:linear-gradient(90deg,#b45309,var(--gld))}
+.kpi-ico{position:absolute;right:11px;top:12px;font-size:22px;opacity:.12}
+.kpi-lbl{font-size:11px;font-weight:600;color:var(--mut2);margin-bottom:4px}
+.kpi-val{font-family:'Teko',sans-serif;font-size:38px;font-weight:600;line-height:1}
+.kpi.all  .kpi-val{color:#60c8ff}
+.kpi.pres .kpi-val{color:var(--grn2)}
+.kpi.abs  .kpi-val{color:var(--red)}
+.kpi.pend .kpi-val{color:var(--gld)}
+.kpi-sub{font-size:11px;color:var(--mut2);margin-top:3px}
+/* progress */
+.prog-card{background:var(--card);border:1px solid var(--bdr);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.prog-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.prog-lbl{font-size:12px;color:var(--mut2);font-weight:600}
+.prog-pct{font-size:18px;font-weight:700}
+.pbar{background:rgba(56,189,100,.1);border-radius:20px;height:8px;overflow:hidden}
+.pbar-fill{height:100%;border-radius:20px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+/* grid */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.acard{background:var(--card);border:1px solid var(--bdr);border-radius:12px;overflow:hidden}
+.acard-hdr{padding:12px 14px;border-bottom:1px solid var(--bdr);font-size:13px;font-weight:700;color:var(--wht);display:flex;align-items:center;justify-content:space-between}
+.twrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:7px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.6px;color:var(--mut2);border-bottom:1px solid var(--bdr)}
+td{padding:8px 12px;border-bottom:1px solid rgba(56,189,100,.04);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.bp{background:rgba(34,197,94,.12);color:var(--grn2);border:1px solid rgba(34,197,94,.2)}
+.ba{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.15)}
+.bo{background:rgba(56,189,100,.1);color:var(--grn);border:1px solid rgba(56,189,100,.15)}
+.bl{background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.12)}
+.chart-c{height:200px;padding:14px}
+.sinput{background:var(--card2);border:1px solid var(--bdr);border-radius:7px;padding:5px 10px;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px;color:var(--txt);outline:none;width:140px}
+/* QR bar */
+.qr-bar{position:fixed;bottom:0;left:0;right:0;z-index:400;background:var(--card);border-top:1px solid var(--bdr2);padding:9px 14px;display:flex;align-items:center;gap:7px;overflow-x:auto;scrollbar-width:none;box-shadow:0 -4px 18px rgba(0,0,0,.4)}
+.qr-bar::-webkit-scrollbar{display:none}
+.qr-lbl{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--mut);text-transform:uppercase;flex-shrink:0}
+.qc{display:inline-flex;align-items:center;gap:4px;padding:6px 13px;border-radius:20px;font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px;font-weight:700;border:1.5px solid var(--bdr2);background:var(--card2);color:var(--txt);cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.qc:active{transform:scale(.95)}
+.qc:hover{background:rgba(56,189,100,.1);border-color:var(--grn);color:var(--grn)}
+.qc.c-grn{border-color:rgba(34,197,94,.35);color:var(--grn2)}
+.qc.c-red{border-color:rgba(239,68,68,.3);color:var(--red)}
+.qc.c-gld{border-color:rgba(226,168,41,.3);color:var(--gld)}
+.qc.c-line{border-color:rgba(6,199,85,.35);background:linear-gradient(135deg,rgba(6,199,85,.12),rgba(0,160,64,.08));color:#06C755}
+/* LINE modal */
+.lm-ov{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:900;padding:20px;backdrop-filter:blur(4px)}
+.lm-modal{background:var(--card);border:1px solid var(--bdr2);border-radius:18px;width:100%;max-width:440px;max-height:85vh;overflow-y:auto}
+.lm-hdr{padding:16px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px}
+.lm-hdr h3{font-size:15px;font-weight:700;color:var(--wht)}
+.lm-sub{font-size:11px;color:var(--mut2)}
+.lm-body{padding:16px}
+.lm-preview{min-height:120px;background:var(--bg);border:1px solid var(--bdr);border-radius:10px;overflow:hidden;margin-bottom:14px;display:flex;align-items:center;justify-content:center}
+.lm-preview img{width:100%;display:block}
+.generating{display:flex;align-items:center;gap:10px;padding:20px;color:var(--mut2);font-size:13px}
+.lm-spin{width:18px;height:18px;border:2px solid rgba(56,189,100,.2);border-top-color:var(--grn);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lm-caption{width:100%;background:var(--bg);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;font-family:'IBM Plex Sans Thai',sans-serif;font-size:13px;color:var(--txt);resize:none;outline:none;margin-bottom:12px}
+.lm-caption:focus{border-color:var(--grn)}
+.lm-acts{display:flex;gap:8px;flex-wrap:wrap}
+.btn-send{background:linear-gradient(135deg,#06C755,#00a040);color:#fff;padding:10px 18px;border:none;border-radius:8px;font-family:'IBM Plex Sans Thai',sans-serif;font-size:14px;font-weight:700;cursor:pointer;flex:1;transition:.18s}
+.btn-send:disabled{opacity:.4;cursor:not-allowed}
+.btn-dl{background:var(--card2);color:var(--txt);border:1px solid var(--bdr);padding:10px 14px;border-radius:8px;font-family:'IBM Plex Sans Thai',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:.18s}
+.btn-cancel{background:transparent;color:var(--mut2);border:1px solid var(--bdr);padding:10px 14px;border-radius:8px;font-family:'IBM Plex Sans Thai',sans-serif;font-size:13px;cursor:pointer}
+.send-ok{display:none;text-align:center;padding:20px}
+.send-ok.show{display:block}
+.sok-ico{font-size:42px;margin-bottom:10px}
+.sok-title{font-size:18px;font-weight:700;color:var(--grn2);margin-bottom:6px}
+.sok-sub{font-size:13px;color:var(--mut2)}
+/* render */
+#renderDiv{position:absolute;left:-9999px;top:0;width:420px}
+/* responsive */
+@media(max-width:900px){.sb{display:none}.kpi-row{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}.main{padding:14px 11px 80px}}
+@media(max-width:500px){.kpi-row{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div id="renderDiv"><div id="renderInner"></div></div>
+
+<!-- LINE Modal -->
+<div class="lm-ov" id="lmOv" style="display:none" onclick="closeLm(event)">
+  <div class="lm-modal" onclick="event.stopPropagation()">
+    <div class="lm-hdr">
+      <span style="font-size:26px">💬</span>
+      <div><h3>ส่งภาพสรุปยอดรวมแถว</h3><div class="lm-sub">LINE Bot → ผบ.ร้อย ป.5 พัน.5</div></div>
+    </div>
+    <div class="lm-body">
+      <div class="lm-preview" id="lmPreview">
+        <div class="generating"><div class="lm-spin"></div><span>กำลัง render ภาพ...</span></div>
+      </div>
+      <div id="lmForm">
+        <textarea class="lm-caption" id="lmCaption" rows="2"></textarea>
+        <div class="lm-acts">
+          <button class="btn-send" id="btnSend" onclick="doSend()" disabled>📤 ส่งให้ ผบ.ร้อย</button>
+          <button class="btn-dl"   id="btnDl"   onclick="dlImg()" disabled>⬇️</button>
+          <button class="btn-cancel" onclick="closeLm()">✕</button>
+        </div>
+      </div>
+      <div class="send-ok" id="sendOk">
+        <div class="sok-ico">✅</div>
+        <div class="sok-title">ส่งเรียบร้อย!</div>
+        <div class="sok-sub" id="sendOkMsg">ส่งภาพให้ ผบ.ร้อย ทาง LINE แล้ว</div>
+        <button class="btn-cancel" style="margin-top:14px;padding:9px 22px" onclick="closeLm()">ปิด</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sb">
+    <div class="sb-logo"><div class="ico">🎖️</div><h2>ระบบรวมแถว</h2><p>ป.5 พัน.5 — Admin</p></div>
+    <div class="sb-nav">
+      <div class="nlbl">เมนู</div>
+      <button class="nitem active" onclick="scrollTop()">📊 Dashboard</button>
+      <button class="nitem" onclick="scrollTo2('notRepTbl')">⏳ ยังไม่รายงาน</button>
+      <button class="nitem" onclick="filterAbsent()">❌ รายการขาด</button>
+    </div>
+    <div class="sb-foot">เสมียน ป.5 พัน.5<br>ระบบรวมแถวออนไลน์</div>
+  </div>
+
+  <div class="main">
+    <div class="page-head">
+      <div>
+        <div class="page-title">📋 เช็คยอด<span>รวมแถว</span></div>
+        <div class="page-sub" id="dateLbl">กำลังโหลด...</div>
+      </div>
+      <div class="head-acts">
+        <input type="date" id="dp" onchange="load()">
+        <button class="btn btn-primary" onclick="load()">🔄 รีเฟรช</button>
+        <button class="btn btn-csv"     onclick="exportCSV()">⬇️ CSV</button>
+        <button class="btn btn-line"    onclick="openLm()">📸 ส่งภาพ LINE ผบ.ร้อย</button>
+      </div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi all" ><div class="kpi-ico">👥</div><div class="kpi-lbl">กำลังพลทั้งหมด</div><div class="kpi-val" id="kv-total">—</div><div class="kpi-sub">นาย</div></div>
+      <div class="kpi pres"><div class="kpi-ico">✅</div><div class="kpi-lbl">มารวมแถว</div>      <div class="kpi-val" id="kv-pres">—</div> <div class="kpi-sub">นาย</div></div>
+      <div class="kpi abs" ><div class="kpi-ico">❌</div><div class="kpi-lbl">ไม่มารวมแถว</div>   <div class="kpi-val" id="kv-abs">—</div>  <div class="kpi-sub">นาย</div></div>
+      <div class="kpi pend"><div class="kpi-ico">⏳</div><div class="kpi-lbl">ยังไม่รายงาน</div>  <div class="kpi-val" id="kv-pend">—</div> <div class="kpi-sub">นาย</div></div>
+    </div>
+
+    <div class="prog-card">
+      <div class="prog-top">
+        <div class="prog-lbl">อัตราการมารวมแถว</div>
+        <div class="prog-pct" id="prog-pct" style="color:var(--grn2)">—%</div>
+      </div>
+      <div class="pbar"><div class="pbar-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+
+    <div class="g2">
+      <div class="acard">
+        <div class="acard-hdr">
+          <span>📝 รายงานวันนี้</span>
+          <input class="sinput" placeholder="🔍 ค้นหา..." id="sinput" oninput="filterTbl()">
+        </div>
+        <div class="twrap">
+          <table>
+            <thead><tr><th>#</th><th>ชื่อ</th><th>สถานะ</th><th>เหตุผล</th><th>เวลา</th><th>สถานะเวลา</th></tr></thead>
+            <tbody id="reportTbl"><tr><td colspan="6" style="text-align:center;color:var(--mut2);padding:18px">กำลังโหลด...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="acard">
+        <div class="acard-hdr">🥧 สัดส่วน</div>
+        <div class="chart-c"><canvas id="donut"></canvas></div>
+      </div>
+    </div>
+
+    <div class="acard" style="margin-bottom:14px">
+      <div class="acard-hdr">⏳ ยังไม่รายงาน (<span id="notRepCnt">0</span> นาย)</div>
+      <div class="twrap">
+        <table>
+          <thead><tr><th>#</th><th>ยศ</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th></tr></thead>
+          <tbody id="notRepTbl"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- QR Bar -->
+<div class="qr-bar">
+  <span class="qr-lbl">ลัด</span>
+  <button class="qc"       onclick="load()">🔄 รีเฟรช</button>
+  <button class="qc c-grn" onclick="scrollTo2('reportTbl')">✅ รายการมา</button>
+  <button class="qc c-gld" onclick="scrollTo2('notRepTbl')">⏳ ยังไม่รายงาน</button>
+  <button class="qc c-red" onclick="filterAbsent()">❌ รายการขาด</button>
+  <button class="qc c-line" onclick="openLm()">📸 ส่ง LINE ผบ.ร้อย</button>
+  <button class="qc"       onclick="exportCSV()">⬇️ CSV</button>
+  <button class="qc"       onclick="pickToday()">📅 วันนี้</button>
+</div>
+
+<script>
+const GAS = 'https://script.google.com/macros/s/AKfycbysLsr3aCrhOiJTXmHgQD7h1LfpDwmke180LI-PXVmzclvgL6hCptxJJBNFp7Z3PQXDsw/exec';
+let summary = null, allRows = [], donutChart = null, capturedImg = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const dp = document.getElementById('dp');
+  dp.value = todayISO();
+  load();
+  setInterval(load, 120000);
+});
+
+async function load() {
+  const iso = document.getElementById('dp').value;
+  const th  = isoToTH(iso);
+  document.getElementById('dateLbl').textContent = 'ข้อมูลวันที่ ' + thDateFull(iso);
+  try {
+    const res = await fetch(GAS + '?action=getSummary&date=' + th);
+    summary = await res.json();
+    render(summary);
+  } catch(e) {
+    document.getElementById('dateLbl').textContent += ' — ⚠️ โหลดไม่สำเร็จ';
+    console.error(e);
+  }
+}
+
+function render(d) {
+  document.getElementById('kv-total').textContent = d.total       || 0;
+  document.getElementById('kv-pres').textContent  = d.present     || 0;
+  document.getElementById('kv-abs').textContent   = d.absent      || 0;
+  document.getElementById('kv-pend').textContent  = d.notReported || 0;
+  document.getElementById('notRepCnt').textContent = d.notReported || 0;
+  const pct = d.total > 0 ? Math.round((d.present/d.total)*100) : 0;
+  const pPct = document.getElementById('prog-pct');
+  pPct.textContent = pct + '%';
+  pPct.style.color = pct>=90?'var(--grn2)':pct>=70?'var(--gld)':'var(--red)';
+  setTimeout(() => {
+    const f = document.getElementById('prog-fill');
+    f.style.width = pct + '%';
+    f.style.background = pct>=90?'linear-gradient(90deg,var(--grn3),var(--grn2))':pct>=70?'linear-gradient(90deg,#b45309,var(--gld))':'linear-gradient(90deg,#991b1b,var(--red))';
+  }, 80);
+  renderDonut(d.present||0, d.absent||0, d.notReported||0);
+  allRows = d.detail || [];
+  filterTbl();
+  renderNotRep(d.notList || []);
+}
+
+function renderDonut(p, a, n) {
+  if (donutChart) donutChart.destroy();
+  const ctx = document.getElementById('donut').getContext('2d');
+  donutChart = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels:['มารวมแถว','ไม่มารวมแถว','ยังไม่รายงาน'],
+           datasets:[{ data:[p,a,n], backgroundColor:['rgba(34,197,94,.7)','rgba(239,68,68,.7)','rgba(245,158,11,.6)'],
+                       borderColor:['#22c55e','#ef4444','#f59e0b'], borderWidth:2 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'63%',
+              plugins:{ legend:{ labels:{ color:'#527a5e', font:{ family:'IBM Plex Sans Thai', size:11 }, padding:10 } },
+                        tooltip:{ callbacks:{ label: c=>' '+c.label+': '+c.parsed+' นาย' } } } }
+  });
+}
+
+function filterTbl() {
+  const q = document.getElementById('sinput').value.toLowerCase();
+  const rows = q ? allRows.filter(r => (r.name||'').toLowerCase().includes(q)) : allRows;
+  const tb = document.getElementById('reportTbl');
+  if (!rows.length) { tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--mut2);padding:18px">ยังไม่มีรายงาน</td></tr>'; return; }
+  tb.innerHTML = rows.map((r,i) => `
+    <tr>
+      <td style="color:var(--mut2)">${i+1}</td>
+      <td>${r.name}</td>
+      <td><span class="badge ${r.status==='มา'?'bp':'ba'}">${r.status}</span></td>
+      <td style="font-size:11px;color:var(--mut2)">${r.reason&&r.reason!=='-'?r.reason:'—'}</td>
+      <td>${r.time||'—'}</td>
+      <td><span class="badge ${r.onTime==='ทันเวลา'?'bo':'bl'}">${r.onTime||'—'}</span></td>
+    </tr>`).join('');
+}
+
+function filterAbsent() {
+  const absent = allRows.filter(r => r.status === 'ไม่มา');
+  const tb = document.getElementById('reportTbl');
+  if (!absent.length) { tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--mut2);padding:18px">✅ ไม่มีคนขาดวันนี้</td></tr>'; }
+  else { const q = document.getElementById('sinput'); q.value=''; allRows = absent; filterTbl(); allRows = summary?.detail||[]; }
+  scrollTo2('reportTbl');
+}
+
+function renderNotRep(list) {
+  const tb = document.getElementById('notRepTbl');
+  if (!list.length) { tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--mut2);padding:14px">✅ กำลังพลทุกนายรายงานแล้ว</td></tr>'; return; }
+  tb.innerHTML = list.map((s,i) => `
+    <tr>
+      <td style="color:var(--mut2)">${i+1}</td>
+      <td><span style="color:var(--grn);font-weight:600">${s.rank||'—'}</span></td>
+      <td>${s.fullName}</td>
+      <td style="font-size:11px;color:var(--mut2)">${s.phone||'—'}</td>
+    </tr>`).join('');
+}
+
+// ── LINE Image Send ──
+async function openLm() {
+  if (!summary) { alert('กรุณาโหลดข้อมูลก่อน'); return; }
+  capturedImg = null;
+  document.getElementById('lmOv').style.display = 'flex';
+  document.getElementById('lmForm').style.display = 'block';
+  document.getElementById('sendOk').classList.remove('show');
+  document.getElementById('btnSend').disabled = true;
+  document.getElementById('btnDl').disabled   = true;
+  document.getElementById('lmPreview').innerHTML = '<div class="generating"><div class="lm-spin"></div><span>กำลัง render ภาพ...</span></div>';
+  const d = summary;
+  document.getElementById('lmCaption').value =
+    '📋 รายงานยอดรวมแถว ' + (d.date||'') + '\n' +
+    '✅ มา ' + d.present + ' | ❌ ไม่มา ' + d.absent + ' | ⏳ ยังไม่รายงาน ' + d.notReported + '\n' +
+    '👥 รวม ' + d.total + ' นาย — อัตราการมา ' + (d.total>0?Math.round(d.present/d.total*100):0) + '%';
+  document.getElementById('renderInner').innerHTML = buildCard(d);
+  await new Promise(r => setTimeout(r, 500));
+  try {
+    const canvas = await html2canvas(document.getElementById('renderInner'), { scale:2, useCORS:true, backgroundColor:'#071209', logging:false });
+    capturedImg = canvas.toDataURL('image/png');
+    document.getElementById('lmPreview').innerHTML = '<img src="'+capturedImg+'" alt="preview">';
+    document.getElementById('btnSend').disabled = false;
+    document.getElementById('btnDl').disabled   = false;
+  } catch(e) {
+    document.getElementById('lmPreview').innerHTML = '<div class="generating"><span style="color:#f87171">⚠️ Render ไม่สำเร็จ: '+e.message+'</span></div>';
+  }
+}
+
+function doSend() {
+  if (!capturedImg) return;
+  const btn = document.getElementById('btnSend');
+  btn.disabled=true; btn.textContent='📡 กำลังส่ง...';
+  const caption = document.getElementById('lmCaption').value;
+  xhrPost(GAS, { action:'sendImage', imageBase64:capturedImg, caption })
+    .then(data => {
+      if (data.ok) {
+        document.getElementById('lmForm').style.display='none';
+        document.getElementById('sendOk').classList.add('show');
+        document.getElementById('sendOkMsg').innerHTML = 'ส่งภาพให้ ผบ.ร้อย ทาง LINE เรียบร้อย';
+      } else {
+        alert('ส่งไม่สำเร็จ: ' + data.msg);
+        btn.disabled=false; btn.textContent='📤 ส่งให้ ผบ.ร้อย';
+      }
+    })
+    .catch(e => { alert('เกิดข้อผิดพลาด: '+e.message); btn.disabled=false; btn.textContent='📤 ส่งให้ ผบ.ร้อย'; });
+}
+
+function dlImg() {
+  if (!capturedImg) return;
+  const a = document.createElement('a');
+  a.href = capturedImg; a.download = 'parade_'+summary?.date+'.png'; a.click();
+}
+function closeLm(e) {
+  if (e && e.target !== document.getElementById('lmOv')) return;
+  document.getElementById('lmOv').style.display='none';
+}
+
+function buildCard(d) {
+  const pct = d.total>0?Math.round(d.present/d.total*100):0;
+  const bar = '█'.repeat(Math.round(pct/10))+'░'.repeat(10-Math.round(pct/10));
+  const color = pct>=90?'#22c55e':pct>=70?'#e2a829':'#ef4444';
+  const absent = (d.detail||[]).filter(r=>r.status==='ไม่มา');
+  return `<div style="background:#071209;padding:24px;font-family:'IBM Plex Sans Thai',sans-serif;color:#c8e6d0;border-radius:16px;width:420px">
+    <div style="text-align:center;margin-bottom:18px">
+      <div style="font-size:30px;margin-bottom:6px">🎖️</div>
+      <div style="font-size:20px;font-weight:700;color:#f0faf3">ยอดรวมแถว ป.5 พัน.5</div>
+      <div style="font-size:13px;color:#527a5e;margin-top:3px">📅 ${d.date}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+      ${[['👥','ทั้งหมด',d.total,'#60c8ff'],['✅','มารวมแถว',d.present,'#22c55e'],['❌','ไม่มา',d.absent,'#ef4444'],['⏳','ยังไม่รายงาน',d.notReported,'#e2a829']].map(([ic,lb,val,clr])=>`
+      <div style="background:#101c14;border-radius:10px;padding:12px 6px;text-align:center;border:1px solid rgba(56,189,100,.15)">
+        <div style="font-size:18px">${ic}</div>
+        <div style="font-size:22px;font-weight:700;color:${clr};font-family:Teko,sans-serif">${val}</div>
+        <div style="font-size:10px;color:#527a5e">${lb}</div>
+      </div>`).join('')}
+    </div>
+    <div style="background:#101c14;border-radius:10px;padding:12px 14px;margin-bottom:${absent.length?'14px':'0'}">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:12px;color:#527a5e;font-weight:600">อัตราการมา</span>
+        <span style="font-size:16px;font-weight:700;color:${color}">${pct}%</span>
+      </div>
+      <div style="font-family:monospace;letter-spacing:2px;color:${color};font-size:16px">${bar}</div>
+    </div>
+    ${absent.length?`<div style="background:#101c14;border-radius:10px;padding:12px 14px;border-left:3px solid #ef4444">
+      <div style="font-size:12px;font-weight:700;color:#ef4444;margin-bottom:8px">❌ ไม่มารวมแถว</div>
+      ${absent.map(r=>`<div style="font-size:12px;color:#c8e6d0;padding:3px 0;border-bottom:1px solid rgba(56,189,100,.06)">• ${r.name} — ${r.reason}</div>`).join('')}
+    </div>`:''}
+  </div>`;
+}
+
+// ── Export CSV ──
+function exportCSV() {
+  if (!summary?.detail?.length) { alert('ยังไม่มีข้อมูล'); return; }
+  const rows = [['วันที่','ชื่อ','สถานะ','เหตุผล','เวลา','สถานะเวลา']];
+  summary.detail.forEach(r => rows.push([summary.date, r.name, r.status, r.reason||'', r.time||'', r.onTime||'']));
+  const csv = rows.map(r => r.map(v => '"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const bom  = '\uFEFF';
+  const blob = new Blob([bom+csv],{type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='parade_'+summary.date+'.csv'; a.click();
+}
+
+// ── helpers ──
+function scrollTo2(id) { const el=document.getElementById(id); if(el) el.closest('.acard')?.scrollIntoView({behavior:'smooth',block:'start'}); }
+function scrollTop()   { window.scrollTo({top:0,behavior:'smooth'}); }
+function pickToday()   { document.getElementById('dp').value=todayISO(); load(); scrollTop(); }
+function todayISO()    { return new Date().toISOString().slice(0,10); }
+function isoToTH(iso)  { const[y,m,d]=iso.split('-'); return d+'/'+m+'/'+y; }
+function thDateFull(iso) {
+  const months=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const[y,m,d]=iso.split('-');
+  return d+' '+months[+m-1]+' '+(+y+543);
+}
+function xhrPost(url, data) {
+  return new Promise((res,rej) => {
+    const x=new XMLHttpRequest(); x.open('POST',url,true);
+    x.setRequestHeader('Content-Type','text/plain;charset=UTF-8'); x.timeout=30000;
+    x.onload=()=>{try{res(JSON.parse(x.responseText))}catch(e){rej(e)}};
+    x.onerror=()=>rej(new Error('Network error')); x.ontimeout=()=>rej(new Error('Timeout'));
+    x.send(JSON.stringify(data));
+  });
+}
+</script>
+</body>
+</html>

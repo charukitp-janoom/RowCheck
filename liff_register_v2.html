@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ลงทะเบียนกำลังพล</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
+:root{
+  --bg:#0d1117;--sur:#161b22;--sur2:#21262d;--bdr:#30363d;
+  --txt:#e6edf3;--mut:#7d8590;--grn:#00c853;--grn2:#009624;
+  --red:#f85149;--yel:#d29922;--blu:#388bfd;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+.ov{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:40px;text-align:center;z-index:999}
+.ov.hidden{display:none}
+.ov-icon{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px}
+.ov-icon.spin{background:rgba(56,139,253,.1);border:2px solid var(--blu);animation:pulse 1.5s infinite}
+.ov-icon.ok{background:rgba(0,200,83,.15);border:2px solid var(--grn)}
+.ov-title{font-size:19px;font-weight:700}
+.ov-title.blue{color:var(--blu)}.ov-title.green{color:var(--grn)}
+.ok-name{font-size:16px;font-weight:600;background:var(--sur);border:1px solid var(--bdr);border-radius:10px;padding:12px 20px;width:100%;max-width:300px}
+.ok-note{font-size:13px;color:var(--grn);background:rgba(0,200,83,.08);border:1px solid rgba(0,200,83,.25);border-radius:8px;padding:10px 14px;width:100%;max-width:300px}
+.hdr{background:var(--sur);border-bottom:1px solid var(--bdr);padding:13px 18px;display:flex;align-items:center;gap:11px;position:sticky;top:0;z-index:100}
+.hdr-ic{width:34px;height:34px;background:linear-gradient(135deg,var(--grn),var(--grn2));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.hdr-name{font-size:15px;font-weight:700}
+.hdr-sub{font-size:11px;color:var(--mut)}
+.badge{margin-left:auto;background:var(--sur2);border:1px solid var(--bdr);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--mut);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.body{padding:18px 15px 40px;max-width:480px;margin:0 auto}
+.steps{display:flex;background:var(--sur);border:1px solid var(--bdr);border-radius:11px;overflow:hidden;margin-bottom:20px}
+.step{flex:1;padding:9px 4px;text-align:center;font-size:11px;color:var(--mut);border-right:1px solid var(--bdr)}
+.step:last-child{border-right:none}
+.step.active{background:rgba(0,200,83,.08);color:var(--grn);font-weight:600}
+.step.done{color:var(--grn)}
+.step-n{display:block;font-size:15px;font-weight:700;font-family:'IBM Plex Mono',monospace;margin-bottom:2px}
+.sbar{border-radius:9px;padding:11px 13px;font-size:13px;display:flex;gap:8px;align-items:flex-start;margin-bottom:14px;line-height:1.5}
+.sbar.hidden{display:none}
+.sbar.err{background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);color:var(--red)}
+.sbar.ok{background:rgba(0,200,83,.08);border:1px solid rgba(0,200,83,.25);color:var(--grn)}
+.sbar.warn{background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.25);color:var(--yel)}
+.card{background:var(--sur);border:1px solid var(--bdr);border-radius:14px;overflow:hidden;margin-bottom:14px}
+.card-h{padding:12px 15px;border-bottom:1px solid var(--bdr);font-size:13px;font-weight:600}
+.card-b{padding:14px 15px;display:flex;flex-direction:column;gap:12px}
+.rank-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.rb{background:var(--sur2);border:1.5px solid var(--bdr);border-radius:9px;padding:9px 4px;text-align:center;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;transition:.15s;user-select:none}
+.rb.sel{background:rgba(0,200,83,.1);border-color:var(--grn);color:var(--grn)}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
+.fld label span{color:var(--red)}
+.frow{display:flex;gap:7px;align-items:flex-end}
+.frow .fld{flex:1}
+input{width:100%;background:var(--bg);border:1px solid var(--bdr);border-radius:7px;padding:10px 13px;font-family:'Sarabun',sans-serif;font-size:15px;color:var(--txt);outline:none;transition:.2s;-webkit-appearance:none}
+input:focus{border-color:var(--grn)}
+input::placeholder{color:var(--mut)}
+.hint{font-size:11px;margin-top:3px}
+.cp-panel{background:var(--sur);border:1px solid rgba(0,200,83,.3);border-radius:14px;overflow:hidden;margin-bottom:14px}
+.cp-h{padding:12px 15px;background:rgba(0,200,83,.08);border-bottom:1px solid rgba(0,200,83,.2);font-size:13px;font-weight:700;color:var(--grn)}
+.cp-row{display:flex;padding:10px 15px;border-bottom:1px solid var(--bdr);gap:10px}
+.cp-row:last-child{border-bottom:none}
+.cp-k{font-size:11px;color:var(--mut);width:85px;flex-shrink:0;padding-top:2px}
+.cp-v{font-size:13px;font-weight:500;word-break:break-all}
+.ex-panel{background:var(--sur);border:1px solid rgba(0,200,83,.25);border-radius:14px;overflow:hidden;margin-bottom:14px}
+.ex-h{padding:12px 15px;font-size:13px;font-weight:600;color:var(--grn);border-bottom:1px solid var(--bdr)}
+.ex-row{display:flex;padding:10px 15px;border-bottom:1px solid var(--bdr);gap:10px}
+.ex-row:last-child{border-bottom:none}
+.ex-k{font-size:11px;color:var(--mut);width:85px;flex-shrink:0;padding-top:2px}
+.ex-v{font-size:13px;font-weight:500}
+.btn{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:13px;border:none;border-radius:9px;font-family:'Sarabun',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:.18s;-webkit-appearance:none}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--grn);color:#000}
+.btn-secondary{background:var(--sur2);color:var(--txt);border:1px solid var(--bdr)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-row{display:flex;gap:7px}
+.btn-row .btn-back{flex:0 0 auto;width:auto;padding:13px 18px}
+.hidden{display:none!important}
+.mt8{margin-top:8px}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(1.06)}}
+</style>
+</head>
+<body>
+
+<div id="ov-load" class="ov">
+  <div class="ov-icon spin">🪖</div>
+  <div class="ov-title blue" id="ov-txt">กำลังโหลด...</div>
+</div>
+
+<div id="ov-ok" class="ov hidden">
+  <div class="ov-icon ok">✅</div>
+  <div class="ov-title green" id="ok-title">ลงทะเบียนสำเร็จ!</div>
+  <div class="ok-name" id="ok-name">—</div>
+  <div class="ok-note" id="ok-note">บันทึกข้อมูลเรียบร้อยแล้ว</div>
+  <button class="btn btn-secondary" style="max-width:240px" onclick="showForm()">✏️ แก้ไขข้อมูล</button>
+  <button class="btn btn-primary"   style="max-width:240px" onclick="liff.closeWindow()">✔️ ปิดกลับสู่แชท</button>
+</div>
+
+<div class="hdr">
+  <div class="hdr-ic">🪖</div>
+  <div><div class="hdr-name">ลงทะเบียนกำลังพล</div><div class="hdr-sub">กองพันทหารปืนใหญ่ที่ 5</div></div>
+  <div class="badge" id="badge">...</div>
+</div>
+
+<div class="body">
+  <div class="steps">
+    <div class="step active" id="s1"><span class="step-n">1</span>กรอกข้อมูล</div>
+    <div class="step"        id="s2"><span class="step-n">2</span>ยืนยัน</div>
+  </div>
+  <div class="sbar hidden" id="sbar"><span id="sbar-ic">ℹ️</span><span id="sbar-txt"></span></div>
+
+  <!-- ข้อมูลเดิม -->
+  <div id="sec-ex" class="hidden">
+    <div class="ex-panel">
+      <div class="ex-h">✅ ลงทะเบียนแล้ว</div>
+      <div class="ex-row"><div class="ex-k">ยศ ชื่อ-สกุล</div><div class="ex-v" id="ex-name">—</div></div>
+      <div class="ex-row"><div class="ex-k">เบอร์โทร</div><div class="ex-v" id="ex-phone">—</div></div>
+      <div class="ex-row"><div class="ex-k">วันที่สมัคร</div><div class="ex-v" id="ex-date">—</div></div>
+    </div>
+    <button class="btn btn-secondary mt8" onclick="showForm()">✏️ แก้ไขข้อมูล</button>
+    <button class="btn btn-primary  mt8" onclick="liff.closeWindow()">✔️ ปิดกลับสู่แชท</button>
+  </div>
+
+  <!-- Step 1: กรอกข้อมูล -->
+  <div id="sec-form" class="hidden">
+    <div class="card">
+      <div class="card-h">🪖 ยศ</div>
+      <div class="card-b">
+        <div class="rank-grid">
+          <button class="rb" onclick="selRank(this,'ร.อ.')">ร.อ.</button>
+          <button class="rb" onclick="selRank(this,'ร.ท.')">ร.ท.</button>
+          <button class="rb" onclick="selRank(this,'ร.ต.')">ร.ต.</button>
+          <button class="rb" onclick="selRank(this,'จ.ส.อ.')">จ.ส.อ.</button>
+          <button class="rb" onclick="selRank(this,'ส.อ.')">ส.อ.</button>
+          <button class="rb" onclick="selRank(this,'ส.ต.')">ส.ต.</button>
+          <button class="rb" onclick="selRank(this,'พลฯ')">พลฯ</button>
+          <button class="rb" onclick="selRank(this,'__other__')">อื่นๆ</button>
+        </div>
+        <div class="fld hidden" id="rank-other-wrap">
+          <input id="rank-other" placeholder="พิมพ์ยศ เช่น พัน.ต." oninput="onRankOther()" autocomplete="off">
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h">👤 ชื่อ-นามสกุล และเบอร์โทร</div>
+      <div class="card-b">
+        <div class="fld">
+          <label>ชื่อ-นามสกุล <span>*</span></label>
+          <input id="f-name" placeholder="เช่น จารุกิตต์ พิมพ์ทอง" oninput="chk()" autocomplete="off">
+        </div>
+        <div class="fld">
+          <label>เบอร์โทรศัพท์ <span>*</span></label>
+          <div class="frow">
+            <div class="fld">
+              <input id="f-phone" type="tel" inputmode="numeric" maxlength="10" placeholder="0803569936" oninput="chk()">
+            </div>
+            <button class="btn btn-secondary" style="width:auto;padding:10px 13px;font-size:13px;flex-shrink:0" onclick="noPhone()">ไม่มีเบอร์</button>
+          </div>
+          <div class="hint" id="phone-hint"></div>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btn-next" onclick="goStep2()" disabled>ถัดไป: ยืนยัน ➜</button>
+  </div>
+
+  <!-- Step 2: ยืนยัน -->
+  <div id="sec-confirm" class="hidden">
+    <div class="cp-panel">
+      <div class="cp-h">✅ ตรวจสอบก่อนบันทึก</div>
+      <div class="cp-row"><div class="cp-k">ยศ ชื่อ-สกุล</div><div class="cp-v" id="c-name">—</div></div>
+      <div class="cp-row"><div class="cp-k">เบอร์โทร</div>   <div class="cp-v" id="c-phone">—</div></div>
+      <div class="cp-row"><div class="cp-k">LINE Name</div>   <div class="cp-v" id="c-line">—</div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary btn-back" onclick="goStep1()">← แก้ไข</button>
+      <button class="btn btn-primary" id="btn-save" onclick="save()">🪖 ยืนยันลงทะเบียน</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const GAS = 'https://script.google.com/macros/s/AKfycbysLsr3aCrhOiJTXmHgQD7h1LfpDwmke180LI-PXVmzclvgL6hCptxJJBNFp7Z3PQXDsw/exec';
+const LIFF_ID = '2009558606-gKtkeQuV';
+const S = { rank:'', uid:'', alias:'', editing:false };
+const $= id => document.getElementById(id);
+
+async function init() {
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+    const p = await liff.getProfile();
+    S.uid = p.userId; S.alias = p.displayName;
+    $('badge').textContent = p.displayName;
+    $('c-line').textContent = p.displayName;
+    $('ov-txt').textContent = 'กำลังตรวจสอบข้อมูล...';
+    const prof = await xhrGet(GAS + '?action=getProfile&uid=' + encodeURIComponent(p.userId));
+    if (prof.found && !S.editing) {
+      $('ex-name').textContent  = prof.soldier.fullName;
+      $('ex-phone').textContent = prof.soldier.phone;
+      $('ex-date').textContent  = prof.soldier.regDate || '—';
+      showSec('sec-ex');
+    } else { showForm(); }
+  } catch(e) { $('ov-txt').textContent = '❌ ' + e.message; setTimeout(showForm, 1500); }
+  finally { $('ov-load').classList.add('hidden'); }
+}
+
+function showForm() { S.editing = true; showSec('sec-form'); setStep(1); clearSbar(); }
+function showSec(id) {
+  ['sec-ex','sec-form','sec-confirm'].forEach(x => $(x).classList.add('hidden'));
+  $(id).classList.remove('hidden');
+}
+
+function selRank(el, val) {
+  document.querySelectorAll('.rb').forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+  const wrap = $('rank-other-wrap');
+  if (val === '__other__') { wrap.classList.remove('hidden'); $('rank-other').focus(); S.rank = $('rank-other').value.trim(); }
+  else { wrap.classList.add('hidden'); S.rank = val; }
+  chk();
+}
+function onRankOther() { S.rank = $('rank-other').value.trim(); chk(); }
+
+function chk() {
+  const phone = $('f-phone').value.trim();
+  const clean = phone.replace(/\D/g,'');
+  const ok    = /^0[689]\d{8}$/.test(clean) || phone === 'ไม่มีเบอร์';
+  const hint  = $('phone-hint');
+  if (phone && phone !== 'ไม่มีเบอร์') {
+    if (ok)                    { hint.style.color='var(--grn)'; hint.textContent='✓ รูปแบบถูกต้อง'; }
+    else if (clean.length >= 4){ hint.style.color='var(--yel)'; hint.textContent='⚠️ ควรขึ้นต้น 06/08/09 10 หลัก'; }
+    else                       { hint.textContent=''; }
+  } else { hint.textContent=''; }
+  $('btn-next').disabled = !(S.rank && $('f-name').value.trim().length >= 2 && ok);
+}
+function noPhone() { $('f-phone').value='ไม่มีเบอร์'; $('phone-hint').textContent=''; chk(); }
+
+function setStep(n) {
+  [1,2].forEach(i => {
+    const el = $('s'+i); el.classList.remove('active','done');
+    if (i < n) el.classList.add('done'); else if (i === n) el.classList.add('active');
+  });
+}
+
+function goStep1() { showSec('sec-form'); setStep(1); clearSbar(); }
+function goStep2() {
+  const name = $('f-name').value.trim(), phone = $('f-phone').value.trim();
+  if (!S.rank || name.length < 2) { showSbar('err','กรุณาเลือกยศและใส่ชื่อ'); return; }
+  if (!phone) { showSbar('err','กรุณาใส่เบอร์โทร'); return; }
+  $('c-name').textContent  = S.rank + ' ' + name;
+  $('c-phone').textContent = phone;
+  showSec('sec-confirm'); setStep(2); clearSbar();
+}
+
+async function save() {
+  const btn = $('btn-save');
+  btn.disabled = true; btn.textContent = '⏳ กำลังบันทึก...';
+  const name = $('f-name').value.trim(), phone = $('f-phone').value.trim();
+  const fullName = S.rank + ' ' + name;
+  const payload  = { action: S.editing ? 'register' : 'register', uid: S.uid, alias: S.alias, rank: S.rank, name, fullName, phone };
+  try {
+    const res = await xhrPost(GAS, payload);
+    if (!res.ok) throw new Error(res.msg || 'บันทึกไม่สำเร็จ');
+    $('ok-title').textContent = res.updated ? 'อัปเดตสำเร็จ!' : 'ลงทะเบียนสำเร็จ!';
+    $('ok-name').textContent  = fullName;
+    $('ok-note').textContent  = (res.updated ? 'อัปเดตข้อมูลเรียบร้อย' : 'บันทึกข้อมูลเรียบร้อย') + '\nสามารถรายงานรวมแถวได้ทันที';
+    $('ov-ok').classList.remove('hidden');
+  } catch(e) {
+    showSbar('err','❌ ' + e.message);
+    btn.disabled = false; btn.textContent = '🪖 ยืนยันลงทะเบียน';
+  }
+}
+
+function showSbar(type, txt) {
+  const b = $('sbar'); b.className = 'sbar ' + type; b.classList.remove('hidden');
+  $('sbar-ic').textContent = {err:'❌',ok:'✅',warn:'⚠️'}[type]||'ℹ️';
+  $('sbar-txt').textContent = txt;
+}
+function clearSbar() { $('sbar').classList.add('hidden'); }
+
+function xhrGet(url) {
+  return new Promise((res,rej) => {
+    const x = new XMLHttpRequest();
+    x.open('GET',url,true); x.timeout=15000;
+    x.onload = () => { try{res(JSON.parse(x.responseText))}catch(e){rej(e)} };
+    x.onerror = () => rej(new Error('Network error'));
+    x.ontimeout = () => rej(new Error('Timeout'));
+    x.send();
+  });
+}
+function xhrPost(url, data) {
+  return new Promise((res,rej) => {
+    const x = new XMLHttpRequest();
+    x.open('POST',url,true);
+    x.setRequestHeader('Content-Type','text/plain;charset=UTF-8');
+    x.timeout=15000;
+    x.onload = () => { try{res(JSON.parse(x.responseText))}catch(e){rej(e)} };
+    x.onerror = () => rej(new Error('Network error'));
+    x.ontimeout = () => rej(new Error('Timeout'));
+    x.send(JSON.stringify(data));
+  });
+}
+
+init();
+</script>
+</body>
+</html>
