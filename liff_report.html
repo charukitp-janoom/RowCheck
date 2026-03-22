@@ -266,8 +266,8 @@
 // ============================================================
 // CONFIG
 // ============================================================
-const LIFF_ID = 'https://liff.line.me/2009558606-O5aQlngY';       // ← ใส่ LIFF ID
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbysLsr3aCrhOiJTXmHgQD7h1LfpDwmke180LI-PXVmzclvgL6hCptxJJBNFp7Z3PQXDsw/exec'; // ← ใส่ GAS URL
+const LIFF_ID = '2009558606-O5aQlngY';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbysLsr3aCrhOiJTXmHgQD7h1LfpDwmke180LI-PXVmzclvgL6hCptxJJBNFp7Z3PQXDsw/exec';
 
 // ============================================================
 // STATE
@@ -502,32 +502,37 @@ async function submitReport() {
     reason:  reason || '-',
   };
 
-  try {
-    // ลอง sendMessages ก่อน (เหมือน liff-scanner)
-    await liff.sendMessages([{
-      type: 'text',
-      text: S.status + '\n' + (reason || '-') + '\n' + S.fullName
-    }]);
-    showSuccess(reason);
-  } catch(e) {
-    // Fallback: POST ไป GAS ด้วย JSON + redirect:'follow'
-    // ห้ามใช้ FormData เพราะ GAS จะ redirect แล้ว browser เปลี่ยน POST→GET ได้ 405
+  // ส่ง sendMessages เฉพาะเมื่ออยู่ใน LINE app จริงๆ
+  if (liff.isInClient()) {
     try {
-      const resp = await fetch(GAS_URL, {
-        method:   'POST',
-        redirect: 'follow',
-        headers:  { 'Content-Type': 'application/json' },
-        body:     JSON.stringify(payload),
-      });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const data = await resp.json();
-      if (data.status !== 'ok') throw new Error(data.message || 'บันทึกล้มเหลว');
-      showSuccess(reason, data.onTime);
-    } catch(e2) {
-      setSbar('error','❌ บันทึกไม่สำเร็จ: ' + e2.message);
-      btn.disabled = false;
-      btn.textContent = S.status === 'มา' ? '✅ ยืนยันมารวมแถว' : '❌ ยืนยันไม่มารวมแถว';
+      await liff.sendMessages([{
+        type: 'text',
+        text: S.status + '\n' + (reason || '-') + '\n' + S.fullName
+      }]);
+      showSuccess(reason);
+      return;
+    } catch(e) {
+      console.warn('sendMessages failed, fallback POST:', e.message);
     }
+  }
+
+  // Fallback: POST JSON ตรงไป GAS
+  try {
+    const resp = await fetch(GAS_URL, {
+      method:   'POST',
+      redirect: 'follow',
+      headers:  { 'Content-Type': 'application/json' },
+      body:     JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.status !== 'ok') throw new Error(data.message || 'บันทึกล้มเหลว');
+    showSuccess(reason, data.onTime);
+  } catch(e2) {
+    console.error('submitReport error:', e2);
+    setSbar('error','❌ บันทึกไม่สำเร็จ: ' + e2.message);
+    btn.disabled = false;
+    btn.textContent = S.status === 'มา' ? '✅ ยืนยันมารวมแถว' : '❌ ยืนยันไม่มารวมแถว';
   }
 }
 
