@@ -46,8 +46,6 @@ input[type=date]{background:var(--card);border:1px solid var(--border2);border-r
 .btn:active{transform:scale(.97)}
 .btn-primary{background:var(--blue);color:#fff}
 .btn-primary:hover{background:#2a7dbb}
-.btn-tg{background:#229ED9;color:#fff}
-.btn-tg:hover{background:#1a8bbf}
 .btn-csv{background:transparent;border:1px solid var(--border2);color:var(--text)}
 .btn-csv:hover{background:rgba(56,189,100,.06)}
 .btn-line{background:linear-gradient(135deg,#06C755,#00a040);color:#fff;font-weight:700}
@@ -183,8 +181,6 @@ tr:last-child td{border-bottom:none}
 .qr-chip.chip-gold:hover{background:rgba(226,168,41,.1)}
 .qr-chip.chip-line {border-color:rgba(6,199,85,.4);background:linear-gradient(135deg,rgba(6,199,85,.15),rgba(0,160,64,.1));color:#06C755}
 .qr-chip.chip-line:hover{background:linear-gradient(135deg,rgba(6,199,85,.25),rgba(0,160,64,.18))}
-.qr-chip.chip-tg   {border-color:rgba(34,158,217,.35);color:#229ED9}
-.qr-chip.chip-tg:hover{background:rgba(34,158,217,.1)}
 
 /* เว้น padding ล่างให้ content ไม่ถูก bar บัง */
 .main{padding-bottom:80px}
@@ -260,7 +256,6 @@ tr:last-child td{border-bottom:none}
       <div class="head-actions">
         <input type="date" id="datePicker" onchange="loadData()">
         <button class="btn btn-primary" onclick="loadData()">🔄 รีเฟรช</button>
-        <button class="btn btn-tg" onclick="sendTg()">📲 Telegram</button>
         <button class="btn btn-csv" onclick="exportCSV()">⬇️ CSV</button>
         <button class="btn btn-line" onclick="openLineSend()">📸 ส่งภาพ LINE ผบ.ร้อย</button>
       </div>
@@ -341,9 +336,6 @@ tr:last-child td{border-bottom:none}
     📸 ส่ง LINE ผบ.ร้อย
   </button>
 
-  <button class="qr-chip chip-tg" onclick="sendTg()" title="ส่งสรุปยอดไป Telegram">
-    📲 Telegram
-  </button>
 
   <button class="qr-chip" onclick="exportCSV()" title="ดาวน์โหลดข้อมูลเป็น CSV">
     ⬇️ CSV
@@ -715,14 +707,6 @@ function pickToday() {
 }
 
 // ════════════════════════════════════════════════
-//  TELEGRAM / CSV
-// ════════════════════════════════════════════════
-async function sendTg() {
-  if (!confirm('ต้องการส่งสรุปยอดไป Telegram หรือไม่?')) return;
-  try {
-    await xhrPost(GAS_URL, { action: 'sendTgSummary' });
-    alert('✅ ส่ง Telegram เรียบร้อย');
-  } catch(e) { alert('เกิดข้อผิดพลาด: ' + e.message); }
 }
 
 function exportCSV() {
