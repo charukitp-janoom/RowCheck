@@ -510,11 +510,15 @@ async function submitReport() {
     }]);
     showSuccess(reason);
   } catch(e) {
-    // Fallback: POST ไป GAS โดยตรง (เหมือน handleLiffSubmit ในระบบพัสดุ)
+    // Fallback: POST ไป GAS ด้วย JSON + redirect:'follow'
+    // ห้ามใช้ FormData เพราะ GAS จะ redirect แล้ว browser เปลี่ยน POST→GET ได้ 405
     try {
-      const form = new FormData();
-      form.append('payload', JSON.stringify(payload));
-      const resp = await fetch(GAS_URL, { method: 'POST', body: form });
+      const resp = await fetch(GAS_URL, {
+        method:   'POST',
+        redirect: 'follow',
+        headers:  { 'Content-Type': 'application/json' },
+        body:     JSON.stringify(payload),
+      });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
       if (data.status !== 'ok') throw new Error(data.message || 'บันทึกล้มเหลว');
