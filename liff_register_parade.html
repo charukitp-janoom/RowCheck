@@ -330,36 +330,29 @@ async function submitRegister() {
   const name     = $('f-name').value.trim();
   const phone    = $('f-phone').value.trim();
   const fullName = S.rank + ' ' + name;
-  const payload  = {
-    action:          S.isEditing ? 'update_profile' : 'register',
-    lineUserId:      S.userId,
-    lineDisplayName: S.lineDisplayName,
-    rank: S.rank, name, fullName, phone,
-  };
 
-  // ส่ง sendMessages เฉพาะเมื่ออยู่ใน LINE app จริงๆ
-  // ถ้าเปิดจาก external browser: liff.isInClient()=false → ข้ามไป POST ตรงๆ
-  if (liff.isInClient()) {
-    try {
-      await liff.sendMessages([{ type:'text', text:'ลงทะเบียน\n' + fullName + '\n' + phone }]);
-      showSuccess(fullName);
-      return;
-    } catch(e) {
-      console.warn('sendMessages failed, fallback POST:', e.message);
-    }
+  // ── วิธีหลัก: sendMessages ผ่าน LINE Chat ──
+  // GAS รับใน handleTextMessage → parse "ลงทะเบียน\nชื่อเต็ม\nเบอร์"
+  try {
+    await liff.sendMessages([{
+      type: 'text',
+      text: 'ลงทะเบียน\n' + fullName + '\n' + phone,
+    }]);
+    showSuccess(fullName);
+    return;
+  } catch(sendErr) {
+    console.warn('sendMessages failed:', sendErr.message);
   }
 
-  // Fallback: POST JSON ตรงไป GAS
+  // ── Fallback: XMLHttpRequest (หลีกเลี่ยง CORS preflight) ──
+  // XHR ไม่ส่ง preflight สำหรับ text/plain → GAS รับได้โดยไม่ต้องการ CORS header
   try {
-    const resp = await fetch(GAS_URL, {
-      method:   'POST',
-      redirect: 'follow',
-      headers:  { 'Content-Type': 'application/json' },
-      body:     JSON.stringify(payload),
+    const result = await xhrPost(GAS_URL, {
+      action: S.isEditing ? 'update_profile' : 'register',
+      lineUserId: S.userId, lineDisplayName: S.lineDisplayName,
+      rank: S.rank, name, fullName, phone,
     });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    if (data.status !== 'ok') throw new Error(data.message || 'GAS error');
+    if (result.status !== 'ok') throw new Error(result.message || 'GAS error');
     showSuccess(fullName);
   } catch(e2) {
     console.error('submitRegister error:', e2);
@@ -382,6 +375,28 @@ function setSbar(type, text) {
   $('sbar-txt').textContent  = text;
 }
 function clearSbar() { $('sbar').classList.add('hidden'); }
+
+// ── XHR helper — หลีกเลี่ยง CORS preflight (GAS ไม่ต้องการ CORS header) ──
+function xhrPost(url, data) {
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    // ใช้ text/plain เพื่อหลีกเลี่ยง preflight OPTIONS
+    // GAS จะรับ e.postData.contents แล้ว parse JSON เองได้
+    xhr.setRequestHeader('Content-Type', 'text/plain;charset=UTF-8');
+    xhr.onload = function() {
+      try {
+        resolve(JSON.parse(xhr.responseText));
+      } catch(e) {
+        reject(new Error('Parse error: ' + xhr.responseText.substring(0,100)));
+      }
+    };
+    xhr.onerror  = function() { reject(new Error('Network error')); };
+    xhr.ontimeout = function() { reject(new Error('Timeout')); };
+    xhr.timeout  = 15000;
+    xhr.send(JSON.stringify(data));
+  });
+}
 
 init();
 </script>
