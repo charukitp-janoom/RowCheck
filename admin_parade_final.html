@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — เช็คยอดรวมแถว ป.5 พัน.5</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Teko:wght@500;600;700&display=swap');
+:root{
+  --bg:#070e0b; --card:#101c14; --card2:#162218;
+  --border:rgba(56,189,100,0.13); --border2:rgba(56,189,100,0.26);
+  --green:#38bd64; --green2:#22c55e; --green3:#15803d;
+  --gold:#e2a829; --blue:#3b9eed; --red:#ef4444;
+  --muted:#3a6047; --muted2:#527a5e;
+  --text:#c8e6d0; --white:#f0faf3;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans Thai',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Layout ── */
+.layout{display:flex;min-height:100vh}
+.sidebar{width:220px;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.sb-logo{padding:0 18px 18px;border-bottom:1px solid var(--border);text-align:center}
+.sb-logo .emb{font-size:26px}
+.sb-logo h2{font-family:'Teko',sans-serif;font-size:18px;font-weight:600;color:var(--green);margin-top:5px;letter-spacing:.5px}
+.sb-logo p{font-size:11px;color:var(--muted2);margin-top:2px}
+.sb-nav{padding:14px 10px;flex:1}
+.nav-lbl{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);padding:10px 8px 5px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;transition:all .15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;font-family:'IBM Plex Sans Thai',sans-serif}
+.nav-item:hover,.nav-item.active{background:rgba(56,189,100,.12);color:var(--green)}
+.sb-footer{padding:14px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--muted2);text-align:center}
+.main{flex:1;padding:26px;overflow-x:hidden}
+
+/* ── Page Header ── */
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px}
+.page-title{font-family:'Teko',sans-serif;font-size:28px;font-weight:600;color:var(--white);letter-spacing:.5px}
+.page-title span{color:var(--green)}
+.page-sub{font-size:12px;color:var(--muted2);margin-top:3px}
+.head-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input[type=date]{background:var(--card);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans Thai',sans-serif;font-size:13px;padding:8px 12px;cursor:pointer}
+
+/* ── Buttons ── */
+.btn{padding:9px 16px;border:none;border-radius:8px;font-family:'IBM Plex Sans Thai',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:#2a7dbb}
+.btn-csv{background:transparent;border:1px solid var(--border2);color:var(--text)}
+.btn-csv:hover{background:rgba(56,189,100,.06)}
+.btn-line{background:linear-gradient(135deg,#06C755,#00a040);color:#fff;font-weight:700}
+.btn-line:hover{background:linear-gradient(135deg,#05b34b,#008f35);box-shadow:0 4px 16px rgba(6,199,85,.4)}
+
+/* ── KPI ── */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:16px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi.all::before    {background:linear-gradient(90deg,var(--blue),#60c8ff)}
+.kpi.present::before{background:linear-gradient(90deg,var(--green3),var(--green2))}
+.kpi.absent::before {background:linear-gradient(90deg,#991b1b,var(--red))}
+.kpi.pending::before{background:linear-gradient(90deg,#b45309,var(--gold))}
+.kpi-ico{position:absolute;right:12px;top:14px;font-size:24px;opacity:.12}
+.kpi-lbl{font-size:11px;font-weight:600;color:var(--muted2);margin-bottom:5px}
+.kpi-val{font-family:'Teko',sans-serif;font-size:40px;font-weight:600;line-height:1}
+.kpi.all     .kpi-val{color:#60c8ff}
+.kpi.present .kpi-val{color:var(--green2)}
+.kpi.absent  .kpi-val{color:var(--red)}
+.kpi.pending .kpi-val{color:var(--gold)}
+.kpi-sub{font-size:11px;color:var(--muted2);margin-top:4px}
+
+/* ── Progress ── */
+.prog-card{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:15px 18px;margin-bottom:16px}
+.prog-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+.prog-lbl{font-size:13px;font-weight:600;color:var(--text)}
+.prog-pct{font-family:'Teko',sans-serif;font-size:24px;font-weight:600}
+.pbar{height:9px;background:rgba(255,255,255,.05);border-radius:20px;overflow:hidden}
+.pbar-fill{height:100%;border-radius:20px;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+
+/* ── Cards / Grid ── */
+.g2{display:grid;grid-template-columns:3fr 2fr;gap:14px;margin-bottom:14px}
+.a-card{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:18px}
+.a-card-title{font-size:13px;font-weight:700;color:var(--blue);margin-bottom:14px;display:flex;align-items:center;gap:7px}
+
+/* ── Table ── */
+.t-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 10px;font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--muted2);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid rgba(56,189,100,.04)}
+tr:hover td{background:rgba(56,189,100,.03)}
+tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.bp{background:rgba(34,197,94,.12);color:#4ade80;border:1px solid rgba(34,197,94,.22)}
+.ba{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.22)}
+.bo{background:rgba(59,158,237,.1);color:#60c8ff;border:1px solid rgba(59,158,237,.2)}
+.bl{background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.2)}
+
+/* ── Chart ── */
+.chart-c{position:relative;height:210px}
+
+/* ── Search ── */
+.s-input{background:rgba(255,255,255,.03);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans Thai',sans-serif;font-size:12px;padding:6px 12px;width:180px}
+.s-input:focus{outline:none;border-color:var(--green)}
+.s-input::placeholder{color:var(--muted2)}
+
+/* ── LINE Modal ── */
+.line-overlay{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px}
+.line-modal{background:#111;border-radius:20px;border:1px solid rgba(6,199,85,.25);max-width:540px;width:100%;box-shadow:0 32px 80px rgba(0,0,0,.7);overflow:hidden;animation:mIn .3s cubic-bezier(.34,1.56,.64,1)}
+@keyframes mIn{from{transform:scale(.88) translateY(20px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+.lm-header{background:linear-gradient(135deg,#06C755,#00a040);padding:15px 20px;display:flex;align-items:center;gap:12px}
+.lm-header h3{color:#fff;font-size:16px;font-weight:700;margin:0}
+.lm-header .lm-sub{color:rgba(255,255,255,.8);font-size:12px;margin-top:2px}
+.lm-body{padding:20px}
+.lm-preview{border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.07);margin-bottom:14px;background:#0a0a0a;min-height:100px;display:flex;align-items:center;justify-content:center}
+.lm-preview img{width:100%;display:block;border-radius:12px}
+.generating{color:#555;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:10px;padding:28px}
+.lm-spin{width:30px;height:30px;border:3px solid rgba(6,199,85,.15);border-top-color:#06C755;border-radius:50%;animation:spin2 .7s linear infinite}
+@keyframes spin2{to{transform:rotate(360deg)}}
+.lm-caption{width:100%;background:#0d0d0d;border:1px solid rgba(255,255,255,.08);border-radius:9px;color:#ddd;font-family:'IBM Plex Sans Thai',sans-serif;font-size:13px;padding:10px 12px;margin-bottom:12px;resize:none}
+.lm-caption:focus{outline:none;border-color:#06C755}
+.lm-actions{display:flex;gap:8px}
+.btn-send{flex:1;padding:13px;background:linear-gradient(135deg,#06C755,#00a040);color:#fff;border:none;border-radius:11px;font-family:'IBM Plex Sans Thai',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s}
+.btn-send:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(6,199,85,.35)}
+.btn-send:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn-dl{padding:13px 14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#aaa;border-radius:11px;font-family:'IBM Plex Sans Thai',sans-serif;font-size:13px;cursor:pointer;transition:all .2s}
+.btn-dl:hover{background:rgba(255,255,255,.1)}
+.btn-dl:disabled{opacity:.4;cursor:not-allowed}
+.btn-cancel{padding:13px 14px;background:transparent;border:1px solid rgba(255,255,255,.08);color:#666;border-radius:11px;font-family:'IBM Plex Sans Thai',sans-serif;font-size:13px;cursor:pointer}
+.send-ok{display:none;text-align:center;padding:24px;animation:mIn .3s ease}
+.send-ok.show{display:block}
+.send-ok .sok-icon{font-size:48px;margin-bottom:10px}
+.send-ok .sok-title{font-size:17px;font-weight:700;color:#06C755}
+.send-ok .sok-sub{font-size:13px;color:#555;margin-top:6px;line-height:1.6}
+
+/* ── Hidden render div ── */
+#renderDiv{position:fixed;left:-9999px;top:0;width:680px;background:#071209;font-family:'IBM Plex Sans Thai',sans-serif}
+
+/* ── Responsive ── */
+@media(max-width:900px){
+  .sidebar{display:none}
+  .kpi-row{grid-template-columns:1fr 1fr}
+  .g2{grid-template-columns:1fr}
+  .main{padding:16px 12px 80px}
+}
+@media(max-width:500px){.kpi-row{grid-template-columns:1fr 1fr}}
+
+/* ── Quick Reply Bar (sticky bottom) ── */
+.qr-bar{
+  position:fixed;bottom:0;left:0;right:0;z-index:500;
+  background:var(--card);
+  border-top:1px solid var(--border2);
+  padding:10px 16px 10px;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  display:flex;align-items:center;gap:8px;overflow-x:auto;
+  scrollbar-width:none;
+  box-shadow:0 -4px 20px rgba(0,0,0,.4);
+}
+.qr-bar::-webkit-scrollbar{display:none}
+.qr-bar-label{
+  font-size:10px;font-weight:700;letter-spacing:1px;
+  color:var(--muted);text-transform:uppercase;
+  flex-shrink:0;white-space:nowrap;
+}
+.qr-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:7px 14px;border-radius:20px;
+  font-family:'IBM Plex Sans Thai',sans-serif;
+  font-size:12px;font-weight:700;
+  border:1.5px solid var(--border2);
+  background:var(--card2);color:var(--text);
+  cursor:pointer;transition:all .15s;
+  white-space:nowrap;flex-shrink:0;
+  -webkit-tap-highlight-color:transparent;
+}
+.qr-chip:active{transform:scale(.95)}
+.qr-chip:hover{background:rgba(56,189,100,.1);border-color:var(--green);color:var(--green)}
+.qr-chip.chip-green{border-color:rgba(34,197,94,.4);color:var(--green2)}
+.qr-chip.chip-green:hover{background:rgba(34,197,94,.12)}
+.qr-chip.chip-red  {border-color:rgba(239,68,68,.35);color:var(--red)}
+.qr-chip.chip-red:hover{background:rgba(239,68,68,.1)}
+.qr-chip.chip-gold {border-color:rgba(226,168,41,.35);color:var(--gold)}
+.qr-chip.chip-gold:hover{background:rgba(226,168,41,.1)}
+.qr-chip.chip-line {border-color:rgba(6,199,85,.4);background:linear-gradient(135deg,rgba(6,199,85,.15),rgba(0,160,64,.1));color:#06C755}
+.qr-chip.chip-line:hover{background:linear-gradient(135deg,rgba(6,199,85,.25),rgba(0,160,64,.18))}
+
+/* เว้น padding ล่างให้ content ไม่ถูก bar บัง */
+.main{padding-bottom:80px}
+</style>
+</head>
+<body>
+
+<!-- ═══ Hidden render div ═══ -->
+<div id="renderDiv"><div id="renderInner"></div></div>
+
+<!-- ═══ LINE Modal ═══ -->
+<div class="line-overlay" id="lineOverlay" style="display:none;" onclick="closeLineModal(event)">
+  <div class="line-modal" onclick="event.stopPropagation()">
+    <div class="lm-header">
+      <span style="font-size:28px;">💬</span>
+      <div>
+        <h3>ส่งภาพสรุปยอดรวมแถว</h3>
+        <div class="lm-sub">LINE Bot → ผบ.ร้อย ป.5 พัน.5</div>
+      </div>
+    </div>
+    <div class="lm-body">
+      <div class="lm-preview" id="lmPreview">
+        <div class="generating"><div class="lm-spin"></div><span>กำลัง render ภาพ...</span></div>
+      </div>
+      <div id="lmForm">
+        <textarea class="lm-caption" id="lmCaption" rows="2"></textarea>
+        <div class="lm-actions">
+          <button class="btn-send" id="btnSend" onclick="doSendLine()">📤 ส่งให้ ผบ.ร้อย</button>
+          <button class="btn-dl"   id="btnDl"   onclick="downloadImg()">⬇️ บันทึก</button>
+          <button class="btn-cancel" onclick="closeLineModal()">✕</button>
+        </div>
+      </div>
+      <div class="send-ok" id="sendOk">
+        <div class="sok-icon">✅</div>
+        <div class="sok-title">ส่งเรียบร้อย!</div>
+        <div class="sok-sub" id="sendOkMsg">ส่งภาพให้ ผบ.ร้อย ทาง LINE แล้ว</div>
+        <button class="btn-cancel" style="margin-top:16px;padding:10px 24px;" onclick="closeLineModal()">ปิด</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sb-logo">
+      <div class="emb">🎖️</div>
+      <h2>ระบบรวมแถว</h2>
+      <p>ป.5 พัน.5 — Admin</p>
+    </div>
+    <div class="sb-nav">
+      <div class="nav-lbl">เมนูหลัก</div>
+      <button class="nav-item active" onclick="showSection('dashboard')">📊 Dashboard ยอดรวม</button>
+      <button class="nav-item" onclick="showSection('absent')">❌ รายการไม่มา</button>
+      <button class="nav-item" onclick="showSection('notreported')">⏳ ยังไม่รายงาน</button>
+      <div class="nav-lbl">ข้อมูล</div>
+      <button class="nav-item" onclick="showSection('soldiers')">👥 ทะเบียนกำลังพล</button>
+      <button class="nav-item" onclick="showSection('history')">📅 ประวัติรายวัน</button>
+    </div>
+    <div class="sb-footer">เสมียน ป.5 พัน.5<br>ระบบรวมแถวออนไลน์</div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Top bar -->
+    <div class="page-head">
+      <div>
+        <div class="page-title">📋 เช็คยอด<span>รวมแถว</span></div>
+        <div class="page-sub" id="dateLabel">กำลังโหลด...</div>
+      </div>
+      <div class="head-actions">
+        <input type="date" id="datePicker" onchange="loadData()">
+        <button class="btn btn-primary" onclick="loadData()">🔄 รีเฟรช</button>
+        <button class="btn btn-csv" onclick="exportCSV()">⬇️ CSV</button>
+        <button class="btn btn-line" onclick="openLineSend()">📸 ส่งภาพ LINE ผบ.ร้อย</button>
+      </div>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpi-row">
+      <div class="kpi all">   <div class="kpi-ico">👥</div><div class="kpi-lbl">กำลังพลทั้งหมด</div><div class="kpi-val" id="kvTotal">—</div><div class="kpi-sub">นาย</div></div>
+      <div class="kpi present"><div class="kpi-ico">✅</div><div class="kpi-lbl">มารวมแถว</div>      <div class="kpi-val" id="kvPresent">—</div><div class="kpi-sub">นาย</div></div>
+      <div class="kpi absent"> <div class="kpi-ico">❌</div><div class="kpi-lbl">ไม่มารวมแถว</div>   <div class="kpi-val" id="kvAbsent">—</div><div class="kpi-sub">นาย</div></div>
+      <div class="kpi pending"><div class="kpi-ico">⏳</div><div class="kpi-lbl">ยังไม่รายงาน</div>  <div class="kpi-val" id="kvPending">—</div><div class="kpi-sub">นาย</div></div>
+    </div>
+
+    <!-- Progress -->
+    <div class="prog-card">
+      <div class="prog-top">
+        <div class="prog-lbl">อัตราการมารวมแถว</div>
+        <div class="prog-pct" id="progPct" style="color:var(--green2)">—%</div>
+      </div>
+      <div class="pbar"><div class="pbar-fill" id="progFill" style="width:0%"></div></div>
+    </div>
+
+    <!-- Chart + Absent -->
+    <div class="g2">
+      <div class="a-card">
+        <div class="a-card-title" style="justify-content:space-between;">
+          <span>📝 รายงานวันนี้</span>
+          <input class="s-input" placeholder="🔍 ค้นหา..." id="searchInput" oninput="filterTable()">
+        </div>
+        <div class="t-wrap">
+          <table>
+            <thead><tr><th>#</th><th>ชื่อ</th><th>สถานะ</th><th>เหตุผล</th><th>เวลา</th><th>สถานะเวลา</th></tr></thead>
+            <tbody id="reportTbl"><tr><td colspan="6" style="text-align:center;color:var(--muted2);padding:20px;">กำลังโหลด...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="a-card">
+        <div class="a-card-title">🥧 สัดส่วน</div>
+        <div class="chart-c"><canvas id="donutChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Not reported -->
+    <div class="a-card" style="margin-bottom:14px;">
+      <div class="a-card-title">⏳ ยังไม่รายงาน (<span id="notRepCount">0</span> นาย)</div>
+      <div class="t-wrap">
+        <table>
+          <thead><tr><th>#</th><th>ยศ</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th></tr></thead>
+          <tbody id="notRepTbl"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ Quick Reply Bar — เสมียน ═══ -->
+<div class="qr-bar" id="qrBar">
+  <div class="qr-bar-label">ลัด</div>
+
+  <button class="qr-chip" onclick="loadData()" title="รีเฟรชข้อมูลล่าสุด">
+    🔄 รีเฟรช
+  </button>
+
+  <button class="qr-chip chip-green" onclick="scrollToSection('reportTbl')" title="ดูรายการรายงานวันนี้">
+    ✅ รายการมา
+  </button>
+
+  <button class="qr-chip chip-red" onclick="scrollToSection('notRepTbl')" title="ดูรายการยังไม่รายงาน">
+    ⏳ ยังไม่รายงาน
+  </button>
+
+  <button class="qr-chip chip-gold" onclick="scrollToAbsent()" title="กรองเฉพาะคนขาด">
+    ❌ รายการขาด
+  </button>
+
+  <button class="qr-chip chip-line" onclick="openLineSend()" title="render ภาพสรุปแล้วส่ง LINE ผบ.ร้อย">
+    📸 ส่ง LINE ผบ.ร้อย
+  </button>
+
+
+  <button class="qr-chip" onclick="exportCSV()" title="ดาวน์โหลดข้อมูลเป็น CSV">
+    ⬇️ CSV
+  </button>
+
+  <button class="qr-chip" onclick="pickToday()" title="กลับมาดูยอดวันนี้">
+    📅 วันนี้
+  </button>
+</div>
+
+<script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbysLsr3aCrhOiJTXmHgQD7h1LfpDwmke180LI-PXVmzclvgL6hCptxJJBNFp7Z3PQXDsw/exec";
+
+let currentSummary = null;
+let allReportRows  = [];
+let donutInst      = null;
+let capturedImage  = null;
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', () => {
+  const p = document.getElementById('datePicker');
+  p.value = getTodayISO();
+  loadData();
+  setInterval(loadData, 120000); // auto-refresh ทุก 2 นาที
+});
+
+// ── Load Data ──
+async function loadData() {
+  const dateISO = document.getElementById('datePicker').value;
+  const dateTH  = isoToThai(dateISO);
+  document.getElementById('dateLabel').textContent = 'ข้อมูลวันที่ ' + formatThaiDateFull(dateISO);
+
+  try {
+    const res  = await fetch(`${GAS_URL}?action=getSummary&date=${dateTH}`);
+    const data = await res.json();
+    currentSummary = data;
+    renderAll(data);
+  } catch(err) {
+    console.error('loadData error:', err);
+    document.getElementById('dateLabel').textContent += ' — ⚠️ โหลดไม่สำเร็จ';
+  }
+}
+
+function renderAll(d) {
+  // KPI
+  document.getElementById('kvTotal').textContent   = d.total        || 0;
+  document.getElementById('kvPresent').textContent = d.present      || 0;
+  document.getElementById('kvAbsent').textContent  = d.absent       || 0;
+  document.getElementById('kvPending').textContent = d.notReported  || 0;
+  document.getElementById('notRepCount').textContent = d.notReported || 0;
+
+  // Progress
+  const pct = d.total > 0 ? Math.round((d.present / d.total) * 100) : 0;
+  document.getElementById('progPct').textContent = pct + '%';
+  document.getElementById('progPct').style.color =
+    pct >= 90 ? 'var(--green2)' : pct >= 70 ? 'var(--gold)' : 'var(--red)';
+  setTimeout(() => {
+    const fill = document.getElementById('progFill');
+    fill.style.width = pct + '%';
+    fill.style.background = pct >= 90
+      ? 'linear-gradient(90deg,var(--green3),var(--green2))'
+      : pct >= 70 ? 'linear-gradient(90deg,#b45309,var(--gold))'
+      : 'linear-gradient(90deg,#991b1b,var(--red))';
+  }, 80);
+
+  // Donut
+  renderDonut(d.present||0, d.absent||0, d.notReported||0);
+
+  // Tables
+  allReportRows = d.detail || [];
+  filterTable();
+  renderNotRep(d.notReportedList || []);
+}
+
+function renderDonut(present, absent, pending) {
+  if (donutInst) donutInst.destroy();
+  const ctx = document.getElementById('donutChart').getContext('2d');
+  donutInst = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['มารวมแถว','ไม่มารวมแถว','ยังไม่รายงาน'],
+      datasets: [{
+        data: [present, absent, pending],
+        backgroundColor: ['rgba(34,197,94,.7)','rgba(239,68,68,.7)','rgba(245,158,11,.6)'],
+        borderColor:     ['#22c55e','#ef4444','#f59e0b'],
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '63%',
+      plugins: {
+        legend: { labels: { color:'#527a5e', font:{ family:'IBM Plex Sans Thai', size:11 }, padding:10 } },
+        tooltip: { callbacks: { label: c => ' '+c.label+': '+c.parsed+' นาย' } }
+      }
+    }
+  });
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const rows = q ? allReportRows.filter(r => r.name.toLowerCase().includes(q)) : allReportRows;
+  const tbody = document.getElementById('reportTbl');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted2);padding:18px;">ยังไม่มีรายงาน</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map((r,i) => `
+    <tr>
+      <td style="color:var(--muted2)">${i+1}</td>
+      <td>${r.name}</td>
+      <td><span class="badge ${r.status==='มา'?'bp':'ba'}">${r.status}</span></td>
+      <td style="font-size:12px;color:var(--muted2)">${r.reason&&r.reason!=='-'?r.reason:'—'}</td>
+      <td>${r.time||'—'}</td>
+      <td><span class="badge ${r.onTime==='ทันเวลา'?'bo':'bl'}">${r.onTime||'—'}</span></td>
+    </tr>`).join('');
+}
+
+function renderNotRep(list) {
+  const tbody = document.getElementById('notRepTbl');
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted2);padding:14px;">✅ กำลังพลทุกนายรายงานแล้ว</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map((s,i) => `
+    <tr>
+      <td style="color:var(--muted2)">${i+1}</td>
+      <td><span style="color:var(--green);font-weight:600">${s.rank||'—'}</span></td>
+      <td>${s.name}</td>
+      <td style="font-size:12px;color:var(--muted2)">${s.phone||'—'}</td>
+    </tr>`).join('');
+}
+
+// ════════════════════════════════════════════════
+//  LINE IMAGE SEND
+// ════════════════════════════════════════════════
+async function openLineSend() {
+  if (!currentSummary) { alert('กรุณาโหลดข้อมูลก่อน'); return; }
+
+  // Reset modal
+  capturedImage = null;
+  document.getElementById('lineOverlay').style.display = 'flex';
+  document.getElementById('lmForm').style.display      = 'block';
+  document.getElementById('sendOk').classList.remove('show');
+  document.getElementById('btnSend').disabled = true;
+  document.getElementById('btnDl').disabled   = true;
+  document.getElementById('lmPreview').innerHTML =
+    '<div class="generating"><div class="lm-spin"></div><span>กำลัง render ภาพ...</span></div>';
+
+  // Set default caption
+  const d = currentSummary;
+  document.getElementById('lmCaption').value =
+    `📋 รายงานยอดรวมแถว ${d.date || ''}\n` +
+    `✅ มา ${d.present} | ❌ ไม่มา ${d.absent} | ⏳ ยังไม่รายงาน ${d.notReported}\n` +
+    `👥 รวม ${d.total} นาย — อัตราการมา ${d.total>0?Math.round(d.present/d.total*100):0}%`;
+
+  // Build render card HTML
+  document.getElementById('renderInner').innerHTML = buildReportCardHTML(d);
+  await new Promise(r => setTimeout(r, 500)); // รอ font/layout
+
+  try {
+    const canvas = await html2canvas(document.getElementById('renderInner'), {
+      scale: 2, useCORS: true, backgroundColor: '#071209', logging: false,
+    });
+    capturedImage = canvas.toDataURL('image/png');
+    document.getElementById('lmPreview').innerHTML = `<img src="${capturedImage}" alt="preview">`;
+    document.getElementById('btnSend').disabled = false;
+    document.getElementById('btnDl').disabled   = false;
+  } catch(err) {
+    document.getElementById('lmPreview').innerHTML =
+      `<div class="generating"><span style="color:#f87171">⚠️ Render ไม่สำเร็จ: ${err.message}</span></div>`;
+  }
+}
+
+async function doSendLine() {
+  if (!capturedImage) return;
+  const btn = document.getElementById('btnSend');
+  btn.disabled = true;
+  btn.textContent = '📡 กำลังส่ง...';
+  const caption = document.getElementById('lmCaption').value;
+
+  // ใช้ XHR text/plain เพื่อหลีกเลี่ยง CORS preflight
+  // (GAS parse JSON จาก postData.contents ได้เลยโดยไม่สนใจ Content-Type)
+  xhrPost(GAS_URL, { action: 'sendImageToLine', imageBase64: capturedImage, caption })
+    .then(function(data) {
+      if (data.success) {
+        document.getElementById('lmForm').style.display = 'none';
+        document.getElementById('sendOk').classList.add('show');
+        document.getElementById('sendOkMsg').innerHTML =
+          'ส่งภาพให้ ผบ.ร้อย ทาง LINE เรียบร้อย' +
+          (data.imageUrl ? '<br><small style="color:var(--muted2)">' + data.imageUrl + '</small>' : '');
+      } else {
+        alert('ส่งไม่สำเร็จ: ' + data.message);
+        btn.disabled = false;
+        btn.textContent = '📤 ส่งให้ ผบ.ร้อย';
+      }
+    })
+    .catch(function(err) {
+      alert('เกิดข้อผิดพลาด: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = '📤 ส่งให้ ผบ.ร้อย';
+    });
+}
+
+// XHR helper — text/plain ไม่มี preflight OPTIONS → GAS รับได้ไม่ติด CORS
+function xhrPost(url, data) {
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Content-Type', 'text/plain;charset=UTF-8');
+    xhr.onload  = function() {
+      try { resolve(JSON.parse(xhr.responseText)); }
+      catch(e) { reject(new Error('Parse error: ' + xhr.responseText.substring(0, 100))); }
+    };
+    xhr.onerror   = function() { reject(new Error('Network error')); };
+    xhr.ontimeout = function() { reject(new Error('Timeout')); };
+    xhr.timeout   = 30000;
+    xhr.send(JSON.stringify(data));
+  });
+}
+
+function downloadImg() {
+  if (!capturedImage) return;
+  const a = document.createElement('a');
+  a.href     = capturedImage;
+  a.download = 'ยอดรวมแถว_' + (document.getElementById('datePicker').value) + '.png';
+  a.click();
+}
+
+function closeLineModal(e) {
+  if (e && e.target !== document.getElementById('lineOverlay')) return;
+  document.getElementById('lineOverlay').style.display = 'none';
+  document.getElementById('btnSend').disabled = false;
+  document.getElementById('btnSend').textContent = '📤 ส่งให้ ผบ.ร้อย';
+}
+
+// ── Build Report Card HTML (render to image) ──
+function buildReportCardHTML(d) {
+  const pct = d.total > 0 ? Math.round(d.present / d.total * 100) : 0;
+  const pctColor = pct >= 90 ? '#22c55e' : pct >= 70 ? '#fbbf24' : '#ef4444';
+
+  const absentRows = (d.detail||[]).filter(r=>r.status==='ไม่มา').map(r=>
+    `<tr>
+      <td style="padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13px;color:#c8e6d0;">${r.name}</td>
+      <td style="padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13px;color:#fbbf24;">${r.reason&&r.reason!=='-'?r.reason:'—'}</td>
+      <td style="padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;color:#527a5e;">${r.time||'—'} (${r.onTime||'—'})</td>
+    </tr>`).join('') || '<tr><td colspan="3" style="padding:10px 14px;color:#3a6047;font-size:12px;">ไม่มีกำลังพลที่ไม่มารวมแถว</td></tr>';
+
+  const notRepRows = (d.notReportedList||[]).slice(0,12).map(s=>
+    `<div style="display:inline-block;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:5px 12px;margin:3px;font-size:12px;">
+      <span style="color:#38bd64;font-weight:600;">${s.rank||''}</span>
+      <span style="color:#c8e6d0;margin-left:4px;">${s.name}</span>
+    </div>`).join('') || '<span style="color:#3a6047;font-size:12px;">กำลังพลทุกนายรายงานแล้ว</span>';
+
+  const now = new Date().toLocaleString("th-TH",{timeZone:"Asia/Bangkok",hour:"2-digit",minute:"2-digit"});
+
+  return `
+<div style="width:680px;background:linear-gradient(160deg,#071209,#0a1a0f,#071510);font-family:'IBM Plex Sans Thai',sans-serif;">
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#040c06,#091b0c);border-bottom:3px solid #e2a829;padding:22px 28px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div style="font-size:40px;">🎖️</div>
+      <div>
+        <div style="font-size:22px;font-weight:700;color:#e2a829;letter-spacing:.5px;">รายงานยอดรวมแถว</div>
+        <div style="font-size:13px;color:#527a5e;margin-top:3px;">กองพันทหารปืนใหญ่ที่ 5 — ป.5 พัน.5</div>
+      </div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:26px;font-weight:700;color:#fff;">${now} น.</div>
+      <div style="font-size:12px;color:#527a5e;margin-top:3px;">${d.date||''}</div>
+    </div>
+  </div>
+
+  <!-- KPI Row -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-bottom:1px solid rgba(56,189,100,0.1);">
+    ${[
+      {lbl:'กำลังพลทั้งหมด', val:d.total,       color:'#60c8ff', icon:'👥'},
+      {lbl:'มารวมแถว',       val:d.present,     color:'#22c55e', icon:'✅'},
+      {lbl:'ไม่มารวมแถว',    val:d.absent,      color:'#ef4444', icon:'❌'},
+      {lbl:'ยังไม่รายงาน',   val:d.notReported, color:'#fbbf24', icon:'⏳'},
+    ].map((k,i)=>`
+      <div style="padding:20px 14px;${i<3?'border-right:1px solid rgba(56,189,100,0.08);':''}text-align:center;">
+        <div style="font-size:26px;margin-bottom:6px;">${k.icon}</div>
+        <div style="font-size:40px;font-weight:700;color:${k.color};line-height:1;">${k.val||0}</div>
+        <div style="font-size:10px;color:#3a6047;margin-top:5px;letter-spacing:.5px;">${k.lbl}</div>
+      </div>`).join('')}
+  </div>
+
+  <!-- Progress -->
+  <div style="padding:18px 28px;border-bottom:1px solid rgba(56,189,100,0.08);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:13px;color:#c8e6d0;font-weight:600;">อัตราการมารวมแถว</span>
+      <span style="font-size:28px;font-weight:700;color:${pctColor};">${pct}%</span>
+    </div>
+    <div style="height:10px;background:rgba(255,255,255,0.05);border-radius:20px;overflow:hidden;">
+      <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#15803d,#22c55e);border-radius:20px;"></div>
+    </div>
+  </div>
+
+  <!-- Absent table -->
+  <div style="padding:18px 28px;border-bottom:1px solid rgba(56,189,100,0.08);">
+    <div style="font-size:13px;font-weight:700;color:#ef4444;margin-bottom:12px;">❌ รายการไม่มารวมแถว (${d.absent||0} นาย)</div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="text-align:left;padding:6px 14px;font-size:11px;color:#3a6047;font-weight:700;letter-spacing:.7px;border-bottom:1px solid rgba(255,255,255,0.08);">ชื่อ-นามสกุล</th>
+        <th style="text-align:left;padding:6px 14px;font-size:11px;color:#3a6047;font-weight:700;border-bottom:1px solid rgba(255,255,255,0.08);">เหตุผล</th>
+        <th style="text-align:left;padding:6px 14px;font-size:11px;color:#3a6047;font-weight:700;border-bottom:1px solid rgba(255,255,255,0.08);">เวลา</th>
+      </tr></thead>
+      <tbody>${absentRows}</tbody>
+    </table>
+  </div>
+
+  <!-- Not reported -->
+  <div style="padding:18px 28px;border-bottom:1px solid rgba(56,189,100,0.08);">
+    <div style="font-size:13px;font-weight:700;color:#fbbf24;margin-bottom:10px;">⏳ ยังไม่รายงาน (${d.notReported||0} นาย)</div>
+    <div>${notRepRows}</div>
+  </div>
+
+  <!-- Footer -->
+  <div style="padding:12px 28px;display:flex;justify-content:space-between;align-items:center;">
+    <div style="font-size:11px;color:#3a6047;">ระบบรายงานรวมแถวออนไลน์ — ป.5 พัน.5</div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <div style="width:7px;height:7px;border-radius:50%;background:#22c55e;"></div>
+      <div style="font-size:11px;color:#3a6047;">Live Data</div>
+    </div>
+  </div>
+</div>`;
+}
+
+// ════════════════════════════════════════════════
+//  SECTION NAV (placeholder — ขยายในอนาคต)
+// ════════════════════════════════════════════════
+function showSection(name) {
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+// Quick Reply helpers
+function scrollToSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.closest('.a-card').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function scrollToAbsent() {
+  // filter ตารางให้เหลือเฉพาะ "ไม่มา" แล้วเลื่อนไปที่ตาราง
+  const q = document.getElementById('searchInput');
+  q.value = '';
+  const tbody = document.getElementById('reportTbl');
+  const absent = allReportRows.filter(r => r.status === 'ไม่มา');
+  if (!absent.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted2);padding:18px;">✅ ไม่มีคนขาดวันนี้</td></tr>';
+  } else {
+    tbody.innerHTML = absent.map((r,i) => `
+      <tr>
+        <td style="color:var(--muted2)">${i+1}</td>
+        <td>${r.name}</td>
+        <td><span class="badge ba">ไม่มา</span></td>
+        <td style="font-size:12px;color:var(--muted2)">${r.reason&&r.reason!=='-'?r.reason:'—'}</td>
+        <td>${r.time||'—'}</td>
+        <td><span class="badge ${r.onTime==='ทันเวลา'?'bo':'bl'}">${r.onTime||'—'}</span></td>
+      </tr>`).join('');
+  }
+  scrollToSection('reportTbl');
+}
+
+function pickToday() {
+  document.getElementById('datePicker').value = getTodayISO();
+  loadData();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ════════════════════════════════════════════════
+}
+
+function exportCSV() {
+  if (!currentSummary || !currentSummary.detail) { alert('ยังไม่มีข้อมูล'); return; }
+  const rows = [['วันที่','ชื่อ','สถานะ','เหตุผล','เวลา','สถานะเวลา']];
+  currentSummary.detail.forEach(r =>
+    rows.push([currentSummary.date, r.name, r.status, r.reason||'', r.time||'', r.onTime||''])
+  );
+  const csv  = '\uFEFF' + rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `รายงานรวมแถว_${document.getElementById('datePicker').value}.csv`;
+  a.click();
+}
+
+// ════════════════════════════════════════════════
+//  DATE UTILITIES
+// ════════════════════════════════════════════════
+function getTodayISO() {
+  const bkk = new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Bangkok"}));
+  return bkk.toISOString().split('T')[0];
+}
+function isoToThai(iso) {
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function formatThaiDateFull(iso) {
+  const [y,m,d] = iso.split('-');
+  const months = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+  return `${parseInt(d)} ${months[parseInt(m)-1]} ${parseInt(y)+543}`;
+}
+</script>
+</body>
+</html>
