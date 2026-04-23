@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>จองห้องประชุม</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Sarabun', sans-serif; }
+    .step { display: none; }
+    .step.active { display: block; }
+    .room-card.selected { border-color: #06C755; background-color: #f0fdf4; }
+    .time-slot { transition: all 0.15s ease; }
+    .time-slot.selected { background-color: #06C755; color: white; border-color: #06C755; }
+    .time-slot:disabled { opacity: 0.35; cursor: not-allowed; background-color: #f3f4f6; color: #9ca3af; }
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #06C755;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .progress-bar { transition: width 0.4s ease; }
+    input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
+    .toast { animation: slideUp 0.3s ease; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <div id="loading-screen" class="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
+    <div class="spinner mb-4"></div>
+    <p class="text-gray-500 text-sm">กำลังโหลด...</p>
+  </div>
+
+  <div id="error-screen" class="hidden fixed inset-0 bg-white flex flex-col items-center justify-center z-50 p-8">
+    <div class="text-5xl mb-4">⚠️</div>
+    <h2 class="text-xl font-semibold text-gray-800 mb-2">เกิดข้อผิดพลาด</h2>
+    <p id="error-message" class="text-gray-500 text-center text-sm"></p>
+    <button onclick="location.reload()" class="mt-6 px-6 py-2 bg-green-500 text-white rounded-lg text-sm font-medium">ลองใหม่</button>
+  </div>
+
+  <div id="app" class="hidden max-w-md mx-auto">
+
+    <div class="bg-white sticky top-0 z-10 shadow-sm">
+      <div class="px-4 pt-5 pb-3">
+        <div class="flex items-center justify-between mb-1">
+          <h1 class="text-lg font-bold text-gray-800">จองห้องประชุม</h1>
+          <span id="step-label" class="text-xs text-gray-400 font-medium">ขั้นตอน 1/4</span>
+        </div>
+        <div class="w-full bg-gray-100 rounded-full h-1.5">
+          <div id="progress-bar" class="progress-bar bg-green-500 h-1.5 rounded-full" style="width: 25%"></div>
+        </div>
+        <div class="flex justify-between mt-2">
+          <span class="text-xs font-medium" id="tab-1" style="color:#06C755">เลือกห้อง</span>
+          <span class="text-xs text-gray-400 font-medium" id="tab-2">เลือกวัน</span>
+          <span class="text-xs text-gray-400 font-medium" id="tab-3">เลือกเวลา</span>
+          <span class="text-xs text-gray-400 font-medium" id="tab-4">รายละเอียด</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="px-4 py-4">
+
+      <!-- Step 1: Room Selection -->
+      <div id="step-1" class="step active fade-in">
+        <p class="text-sm text-gray-500 mb-3">เลือกห้องประชุมที่ต้องการใช้งาน</p>
+        <div id="room-list" class="space-y-3">
+          <div class="flex justify-center py-8"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Step 2: Date Selection -->
+      <div id="step-2" class="step fade-in">
+        <p class="text-sm text-gray-500 mb-3">เลือกวันที่ต้องการจอง</p>
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <label class="block text-sm font-semibold text-gray-700 mb-2">วันที่จอง</label>
+          <input type="date" id="booking-date"
+            class="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-base focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent" />
+          <div id="selected-room-summary" class="mt-4 p-3 bg-green-50 rounded-xl border border-green-100">
+            <p class="text-xs text-green-700 font-medium">ห้องที่เลือก</p>
+            <p id="summary-room-name" class="text-sm font-semibold text-green-900 mt-0.5"></p>
+            <p id="summary-room-detail" class="text-xs text-green-700 mt-0.5"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Time Selection -->
+      <div id="step-3" class="step fade-in">
+        <p class="text-sm text-gray-500 mb-3">เลือกช่วงเวลาที่ต้องการจอง</p>
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">เวลาเริ่มต้น</label>
+            <div id="start-time-slots" class="grid grid-cols-4 gap-2"></div>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">เวลาสิ้นสุด</label>
+            <div id="end-time-slots" class="grid grid-cols-4 gap-2"></div>
+          </div>
+          <div id="duration-badge" class="hidden mt-1 text-center">
+            <span class="inline-block bg-blue-50 text-blue-700 text-xs font-semibold px-3 py-1 rounded-full border border-blue-100">
+              ระยะเวลา: <span id="duration-text"></span>
+            </span>
+          </div>
+        </div>
+        <div id="conflict-warning" class="hidden mt-3 p-3 bg-red-50 rounded-xl border border-red-200">
+          <p class="text-xs text-red-600 font-medium">⚠️ ช่วงเวลานี้มีการจองแล้ว กรุณาเลือกเวลาอื่น</p>
+        </div>
+      </div>
+
+      <!-- Step 4: Details -->
+      <div id="step-4" class="step fade-in">
+        <p class="text-sm text-gray-500 mb-3">กรอกรายละเอียดการประชุม</p>
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">ชื่อการประชุม <span class="text-red-400">*</span></label>
+            <input type="text" id="meeting-title" placeholder="ระบุหัวข้อการประชุม"
+              class="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent" />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">จำนวนผู้เข้าร่วม <span class="text-red-400">*</span></label>
+            <div class="flex items-center gap-3">
+              <button onclick="adjustCount(-1)" class="w-10 h-10 rounded-full border border-gray-200 text-xl font-bold text-gray-600 flex items-center justify-center hover:bg-gray-50">−</button>
+              <input type="number" id="attendee-count" value="1" min="1"
+                class="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent" />
+              <button onclick="adjustCount(1)" class="w-10 h-10 rounded-full border border-gray-200 text-xl font-bold text-gray-600 flex items-center justify-center hover:bg-gray-50">+</button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">รายละเอียด / วาระการประชุม</label>
+            <textarea id="meeting-desc" rows="3" placeholder="ระบุรายละเอียดเพิ่มเติม (ไม่บังคับ)"
+              class="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent resize-none"></textarea>
+          </div>
+        </div>
+
+        <div class="mt-4 bg-white rounded-2xl border border-gray-200 p-4 shadow-sm space-y-2">
+          <p class="text-sm font-semibold text-gray-700 mb-2">สรุปการจอง</p>
+          <div class="flex justify-between text-sm"><span class="text-gray-500">ห้อง</span><span id="confirm-room" class="font-medium text-gray-800 text-right max-w-[60%]"></span></div>
+          <div class="flex justify-between text-sm"><span class="text-gray-500">วันที่</span><span id="confirm-date" class="font-medium text-gray-800"></span></div>
+          <div class="flex justify-between text-sm"><span class="text-gray-500">เวลา</span><span id="confirm-time" class="font-medium text-gray-800"></span></div>
+          <div class="flex justify-between text-sm"><span class="text-gray-500">ระยะเวลา</span><span id="confirm-duration" class="font-medium text-gray-800"></span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="sticky bottom-0 bg-white border-t border-gray-100 px-4 py-3 flex gap-3">
+      <button id="btn-back" onclick="prevStep()"
+        class="hidden flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50">
+        ← ย้อนกลับ
+      </button>
+      <button id="btn-next" onclick="nextStep()"
+        class="flex-1 py-3 rounded-xl font-semibold text-sm text-white"
+        style="background-color: #06C755;">
+        ถัดไป →
+      </button>
+    </div>
+
+  </div>
+
+  <div id="success-screen" class="hidden fixed inset-0 bg-white flex flex-col items-center justify-center z-50 p-8">
+    <div class="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-5">
+      <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+    </div>
+    <h2 class="text-2xl font-bold text-gray-800 mb-2">จองสำเร็จ!</h2>
+    <p id="success-booking-id" class="text-sm text-gray-500 mb-1"></p>
+    <p id="success-status" class="text-sm font-semibold mb-6"></p>
+    <div class="w-full bg-gray-50 rounded-2xl border border-gray-200 p-4 space-y-2 text-left">
+      <div class="flex justify-between text-sm"><span class="text-gray-500">ห้อง</span><span id="sc-room" class="font-medium text-gray-800"></span></div>
+      <div class="flex justify-between text-sm"><span class="text-gray-500">วันที่</span><span id="sc-date" class="font-medium text-gray-800"></span></div>
+      <div class="flex justify-between text-sm"><span class="text-gray-500">เวลา</span><span id="sc-time" class="font-medium text-gray-800"></span></div>
+    </div>
+    <button onclick="closeApp()" class="mt-6 w-full py-3 rounded-xl font-semibold text-white text-sm" style="background-color:#06C755;">
+      ปิดหน้าต่าง
+    </button>
+  </div>
+
+  <div id="toast" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-white text-sm font-medium shadow-lg toast" style="background-color:#1f2937; white-space:nowrap;"></div>
+
+  <script>
+    const GAS_URL = window.location.href.split('?')[0];
+    const LIFF_ID = '@@LIFF_ID@@';
+    const TIME_SLOTS = ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];
+
+    let currentStep = 1;
+    let userId = '';
+    let displayName = '';
+    let selectedRoom = null;
+    let selectedDate = '';
+    let selectedStart = '';
+    let selectedEnd = '';
+    let bookedSlots = [];
+    let rooms = [];
+
+    async function init() {
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        if (!liff.isLoggedIn()) { liff.login(); return; }
+        const profile = await liff.getProfile();
+        userId = profile.userId;
+        displayName = profile.displayName;
+        const params = new URLSearchParams(window.location.search);
+        const preRoomId = params.get('room_id');
+        await loadRooms(preRoomId);
+        const today = new Date().toISOString().split('T')[0];
+        const dateInput = document.getElementById('booking-date');
+        dateInput.min = today;
+        dateInput.value = today;
+        dateInput.addEventListener('change', onDateChange);
+        document.getElementById('loading-screen').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+      } catch (err) {
+        showError(err.message || 'ไม่สามารถเชื่อมต่อ LINE ได้');
+      }
+    }
+
+    async function loadRooms(preSelectId) {
+      try {
+        const res = await fetch(GAS_URL + '?action=rooms');
+        const data = await res.json();
+        rooms = data.rooms || [];
+        renderRooms();
+        if (preSelectId) {
+          const found = rooms.find(r => r.room_id === preSelectId);
+          if (found) selectRoom(found);
+        }
+      } catch {
+        document.getElementById('room-list').innerHTML =
+          '<p class="text-center text-red-500 text-sm py-8">ไม่สามารถโหลดข้อมูลห้องได้</p>';
+      }
+    }
+
+    function renderRooms() {
+      const list = document.getElementById('room-list');
+      if (!rooms.length) {
+        list.innerHTML = '<p class="text-center text-gray-400 text-sm py-8">ไม่มีห้องประชุมที่พร้อมใช้งาน</p>';
+        return;
+      }
+      list.innerHTML = rooms.map(room => `
+        <div id="room-card-${room.room_id}"
+          onclick="selectRoom(${JSON.stringify(room).replace(/"/g,'&quot;')})"
+          class="room-card bg-white rounded-2xl border-2 border-gray-100 p-4 cursor-pointer hover:border-green-300 transition-all shadow-sm">
+          <div class="flex justify-between items-start">
+            <div class="flex-1 pr-3">
+              <h3 class="font-bold text-gray-800 text-base">${room.room_name}</h3>
+              <p class="text-xs text-gray-500 mt-0.5">📍 ${room.location || '-'}</p>
+              <div class="flex flex-wrap gap-1 mt-2">
+                ${(room.facilities || '').split(',').filter(Boolean).map(f =>
+                  `<span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">${f.trim()}</span>`
+                ).join('')}
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              <div class="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-semibold px-2 py-1 rounded-lg">
+                👥 ${room.capacity}
+              </div>
+              <p class="text-xs text-gray-400 mt-1">${room.open_time || '08:00'} - ${room.close_time || '18:00'}</p>
+              ${room.requires_approval === 'TRUE' || room.requires_approval === true
+                ? '<p class="text-xs text-orange-500 font-medium mt-1">⏳ ต้องอนุมัติ</p>'
+                : '<p class="text-xs text-green-600 font-medium mt-1">✅ จองได้ทันที</p>'}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function selectRoom(room) {
+      selectedRoom = room;
+      document.querySelectorAll('.room-card').forEach(el => el.classList.remove('selected'));
+      const card = document.getElementById('room-card-' + room.room_id);
+      if (card) card.classList.add('selected');
+    }
+
+    function onDateChange() {
+      selectedDate = document.getElementById('booking-date').value;
+      selectedStart = '';
+      selectedEnd = '';
+      document.getElementById('summary-room-name').textContent = selectedRoom ? selectedRoom.room_name : '';
+      document.getElementById('summary-room-detail').textContent = selectedRoom
+        ? `ความจุ ${selectedRoom.capacity} คน | ${selectedRoom.open_time || '08:00'} - ${selectedRoom.close_time || '18:00'}`
+        : '';
+    }
+
+    async function loadTimeSlots() {
+      document.getElementById('start-time-slots').innerHTML = '<div class="col-span-4 flex justify-center py-4"><div class="spinner"></div></div>';
+      document.getElementById('end-time-slots').innerHTML = '';
+      document.getElementById('conflict-warning').classList.add('hidden');
+      document.getElementById('duration-badge').classList.add('hidden');
+      selectedStart = '';
+      selectedEnd = '';
+
+      try {
+        const res = await fetch(`${GAS_URL}?action=booked_slots&room_id=${selectedRoom.room_id}&date=${selectedDate}`);
+        const data = await res.json();
+        bookedSlots = data.slots || [];
+      } catch {
+        bookedSlots = [];
+      }
+
+      const openTime = selectedRoom.open_time || '08:00';
+      const closeTime = selectedRoom.close_time || '18:00';
+      const validSlots = TIME_SLOTS.filter(t => t >= openTime && t <= closeTime);
+
+      renderStartSlots(validSlots);
+    }
+
+    function renderStartSlots(slots) {
+      const container = document.getElementById('start-time-slots');
+      container.innerHTML = slots.map(t => {
+        const disabled = isSlotBooked(t);
+        return `<button class="time-slot text-xs border rounded-lg py-2 font-medium ${disabled ? 'border-gray-200' : 'border-gray-300 hover:border-green-400 hover:text-green-600'}"
+          onclick="selectStartTime('${t}')" ${disabled ? 'disabled' : ''}>${t}</button>`;
+      }).join('');
+    }
+
+    function selectStartTime(time) {
+      selectedStart = time;
+      selectedEnd = '';
+      document.querySelectorAll('#start-time-slots .time-slot').forEach(btn => btn.classList.remove('selected'));
+      event.target.classList.add('selected');
+      document.getElementById('duration-badge').classList.add('hidden');
+
+      const openTime = selectedRoom.open_time || '08:00';
+      const closeTime = selectedRoom.close_time || '18:00';
+      const validSlots = TIME_SLOTS.filter(t => t > time && t >= openTime && t <= closeTime);
+
+      const endContainer = document.getElementById('end-time-slots');
+      endContainer.innerHTML = validSlots.map(t => {
+        const conflict = hasConflictInRange(time, t);
+        return `<button class="time-slot text-xs border rounded-lg py-2 font-medium ${conflict ? 'border-gray-200' : 'border-gray-300 hover:border-green-400 hover:text-green-600'}"
+          onclick="selectEndTime('${t}')" ${conflict ? 'disabled' : ''}>${t}</button>`;
+      }).join('');
+    }
+
+    function selectEndTime(time) {
+      selectedEnd = time;
+      document.querySelectorAll('#end-time-slots .time-slot').forEach(btn => btn.classList.remove('selected'));
+      event.target.classList.add('selected');
+      const mins = timeToMinutes(time) - timeToMinutes(selectedStart);
+      const hours = Math.floor(mins / 60);
+      const remaining = mins % 60;
+      const label = hours > 0 ? `${hours} ชม. ${remaining > 0 ? remaining + ' นาที' : ''}` : `${remaining} นาที`;
+      document.getElementById('duration-text').textContent = label.trim();
+      document.getElementById('duration-badge').classList.remove('hidden');
+    }
+
+    function isSlotBooked(time) {
+      return bookedSlots.some(slot => time >= slot.start && time < slot.end);
+    }
+
+    function hasConflictInRange(start, end) {
+      return bookedSlots.some(slot => start < slot.end && end > slot.start);
+    }
+
+    function timeToMinutes(time) {
+      const [h, m] = time.split(':').map(Number);
+      return h * 60 + m;
+    }
+
+    function updateProgress() {
+      const pct = (currentStep / 4) * 100;
+      document.getElementById('progress-bar').style.width = pct + '%';
+      document.getElementById('step-label').textContent = `ขั้นตอน ${currentStep}/4`;
+      ['tab-1','tab-2','tab-3','tab-4'].forEach((id, i) => {
+        const el = document.getElementById(id);
+        el.style.color = i + 1 <= currentStep ? '#06C755' : '#9ca3af';
+        el.style.fontWeight = i + 1 === currentStep ? '700' : '500';
+      });
+      document.getElementById('btn-back').classList.toggle('hidden', currentStep === 1);
+      document.getElementById('btn-next').textContent = currentStep === 4 ? '✓ ยืนยันการจอง' : 'ถัดไป →';
+    }
+
+    function showStep(n) {
+      document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+      const el = document.getElementById('step-' + n);
+      el.classList.add('active');
+      void el.offsetWidth;
+      el.classList.add('fade-in');
+      updateProgress();
+    }
+
+    async function nextStep() {
+      if (currentStep === 1) {
+        if (!selectedRoom) { showToast('กรุณาเลือกห้องประชุม'); return; }
+        currentStep = 2;
+        showStep(2);
+        onDateChange();
+      } else if (currentStep === 2) {
+        selectedDate = document.getElementById('booking-date').value;
+        if (!selectedDate) { showToast('กรุณาเลือกวันที่'); return; }
+        currentStep = 3;
+        showStep(3);
+        await loadTimeSlots();
+      } else if (currentStep === 3) {
+        if (!selectedStart) { showToast('กรุณาเลือกเวลาเริ่มต้น'); return; }
+        if (!selectedEnd) { showToast('กรุณาเลือกเวลาสิ้นสุด'); return; }
+        currentStep = 4;
+        showStep(4);
+        fillSummary();
+      } else if (currentStep === 4) {
+        await submitBooking();
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 1) { currentStep--; showStep(currentStep); }
+    }
+
+    function fillSummary() {
+      const dateObj = new Date(selectedDate + 'T00:00:00');
+      const dateStr = dateObj.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+      const mins = timeToMinutes(selectedEnd) - timeToMinutes(selectedStart);
+      const hours = Math.floor(mins / 60);
+      const rem = mins % 60;
+      const durLabel = hours > 0 ? `${hours} ชม. ${rem > 0 ? rem + ' นาที' : ''}` : `${rem} นาที`;
+      document.getElementById('confirm-room').textContent = selectedRoom.room_name;
+      document.getElementById('confirm-date').textContent = dateStr;
+      document.getElementById('confirm-time').textContent = selectedStart + ' - ' + selectedEnd;
+      document.getElementById('confirm-duration').textContent = durLabel.trim();
+    }
+
+    async function submitBooking() {
+      const title = document.getElementById('meeting-title').value.trim();
+      const attendeeCount = parseInt(document.getElementById('attendee-count').value) || 1;
+      const description = document.getElementById('meeting-desc').value.trim();
+      if (!title) { showToast('กรุณาระบุชื่อการประชุม'); return; }
+      if (attendeeCount > parseInt(selectedRoom.capacity)) {
+        showToast(`จำนวนผู้เข้าร่วมเกินความจุห้อง (${selectedRoom.capacity} คน)`);
+        return;
+      }
+      const btn = document.getElementById('btn-next');
+      btn.disabled = true;
+      btn.textContent = 'กำลังบันทึก...';
+      try {
+        const payload = {
+          action: 'book',
+          user_id: userId,
+          room_id: selectedRoom.room_id,
+          title,
+          description,
+          date: selectedDate,
+          start_time: selectedStart,
+          end_time: selectedEnd,
+          attendee_count: attendeeCount
+        };
+        const res = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (result.success) {
+          showSuccessScreen(result);
+        } else {
+          showToast(result.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่');
+          btn.disabled = false;
+          btn.textContent = '✓ ยืนยันการจอง';
+        }
+      } catch {
+        showToast('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+        btn.disabled = false;
+        btn.textContent = '✓ ยืนยันการจอง';
+      }
+    }
+
+    function showSuccessScreen(result) {
+      const dateObj = new Date(selectedDate + 'T00:00:00');
+      const dateStr = dateObj.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+      document.getElementById('success-booking-id').textContent = 'รหัสการจอง: ' + result.booking_id;
+      document.getElementById('success-status').textContent =
+        result.status === 'pending' ? '⏳ รอการอนุมัติจากผู้ดูแล' : '✅ ยืนยันการจองแล้ว';
+      document.getElementById('success-status').style.color = result.status === 'pending' ? '#f59e0b' : '#06C755';
+      document.getElementById('sc-room').textContent = selectedRoom.room_name;
+      document.getElementById('sc-date').textContent = dateStr;
+      document.getElementById('sc-time').textContent = selectedStart + ' - ' + selectedEnd;
+      document.getElementById('app').classList.add('hidden');
+      document.getElementById('success-screen').classList.remove('hidden');
+    }
+
+    function closeApp() {
+      if (liff.isInClient()) { liff.closeWindow(); } else { window.close(); }
+    }
+
+    function adjustCount(delta) {
+      const input = document.getElementById('attendee-count');
+      const val = parseInt(input.value) || 1;
+      const max = selectedRoom ? parseInt(selectedRoom.capacity) : 999;
+      input.value = Math.max(1, Math.min(max, val + delta));
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3000);
+    }
+
+    function showError(msg) {
+      document.getElementById('loading-screen').classList.add('hidden');
+      document.getElementById('error-message').textContent = msg;
+      document.getElementById('error-screen').classList.remove('hidden');
+    }
+
+    init();
+  </script>
+</body>
+</html>
